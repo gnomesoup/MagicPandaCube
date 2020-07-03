@@ -3,8 +3,19 @@ from panda3d.core import AmbientLight, DirectionalLight
 from panda3d.core import LVector3, Vec4
 from panda3d.core import Material
 from panda3d.core import Texture
+from panda3d.core import NodePath
 from direct.gui.DirectGui import OnscreenText
+import sys
 import builtins
+
+# Camera constants
+CAMERADIST = 8
+CAMERAPOS = (
+    (-CAMERADIST, CAMERADIST, CAMERADIST),
+    (-CAMERADIST, -CAMERADIST, CAMERADIST),
+    (CAMERADIST, -CAMERADIST, CAMERADIST), 
+    (CAMERADIST, CAMERADIST, CAMERADIST)
+    )
 
 def hexColor(hex):
     if len(hex) < 8:
@@ -29,15 +40,26 @@ class MagicPandaCube(ShowBase):
                                   pos=(0, .1),
                                   scale=.1)
 
+        self.accept('escape', sys.exit)  # Escape quits
+        self.accept('q', sys.exit)  # Escape quits
+        self.accept('Q', sys.exit)  # Escape quits
         builtins.base.disableMouse()
-        # builtins.camera.setPosHpr(5, -5, 5, -45, -45, 0)  # Set the cameras' position
-        builtins.camera.setPosHpr(6, -6, 6, 45, -40, 0)
+        self.cameraPosition = 0
+        builtins.camera.setPos(CAMERAPOS[self.cameraPosition])
+        builtins.camera.lookAt(0, 0, 0)
         builtins.base.camLens.setNear(1)
 
         self.loadModels()
         self.setupLights()
 
+        self.accept("arrow_right", self.changeCameraXY, [1])
+        self.accept("arrow_left", self.changeCameraXY, [-1])
+        self.accept("arrow_up", self.changeCameraZ, [-1])
+        self.accept("arrow_down", self.changeCameraZ, [1])
+
     def loadModels(self):
+        black = Material()
+        black.setAmbient((0, 0, 0, 1))
         white = Material()
         white.setAmbient((1, 1, 1, 1))
         blue = Material()
@@ -50,24 +72,77 @@ class MagicPandaCube(ShowBase):
         orange.setAmbient(hexColor("f4941f"))
         yellow = Material()
         yellow.setAmbient(hexColor("fecc30"))
-        #Load a corner
+
+        # #Load a corner
         # self.corner = builtins.loader.loadModel("./corner.egg")
-        # self.corner.reparentTo(render)
-        # red = Material()
-        # originalMat = self.corner.findMaterial("Material.004")
-        # self.corner.replaceMaterial(originalMat, red)
-        # originalText = self.corner.findTexture("pbr-fallback")
-        # originalText.clear()
-        # self.corner.clearTexture()
-        self.edge = builtins.loader.loadModel("./edge.egg")
-        # print(self.edge.findAllMaterials())
-        sideMat = self.edge.findMaterial("Side")
-        self.edge.replaceMaterial(sideMat, blue)
-        frontMat = self.edge.findMaterial("Face")
-        self.edge.replaceMaterial(frontMat, orange)
-        self.edge.reparentTo(render)
-        self.center = builtins.loader.loadModel("./center.egg")
-        self.center.reparentTo(render)
+        # self.corner.reparentTo(builtins.render)
+        # faceMat = self.corner.findMaterial("Face")
+        # self.corner.replaceMaterial(faceMat, blue)
+        # sideMat = self.corner.findMaterial("Side")
+        # self.corner.replaceMaterial(sideMat, blue)
+        # topMat = self.corner.findMaterial("Top")
+        # self.corner.replaceMaterial(topMat, blue)
+
+        # self.edge = builtins.loader.loadModel("./edge.egg")
+        # sideMat = self.edge.findMaterial("Side")
+        # self.edge.replaceMaterial(sideMat, orange)
+        # faceMat = self.edge.findMaterial("Face")
+        # self.edge.replaceMaterial(faceMat, orange)
+
+        # self.center = builtins.loader.loadModel("./center.egg")
+        # faceMat = self.center.findMaterial("Face")
+        # self.center.replaceMaterial(faceMat, yellow)
+
+        self.cube = builtins.render.attachNewNode("cube")
+        self.cube.setPos(-1.05, -1.05, -1.05)
+        self.cubies = [None for i in range(27)]
+        i = 0
+        for x in range(3):
+            for y in range(3):
+                for z in range(3):
+                    cubieType = "cubie"
+                    self.cubies[i] = builtins.loader.loadModel(cubieType)
+                    self.cubies[i].setPos(x * 1.05, y * 1.05, z * 1.05)
+                    self.cubies[i].reparentTo(self.cube)
+                    if(z == 2):
+                        oldMat = self.cubies[i].findMaterial("Up")
+                        self.cubies[i].replaceMaterial(oldMat, yellow)
+                    else:
+                        oldMat = self.cubies[i].findMaterial("Up")
+                        self.cubies[i].replaceMaterial(oldMat, black)
+                    if(z == 0):
+                        oldMat = self.cubies[i].findMaterial("Down")
+                        self.cubies[i].replaceMaterial(oldMat, white)
+                    else:
+                        oldMat = self.cubies[i].findMaterial("Down")
+                        self.cubies[i].replaceMaterial(oldMat, black)
+                    if(y == 2):
+                        oldMat = self.cubies[i].findMaterial("Front")
+                        self.cubies[i].replaceMaterial(oldMat, blue)
+                    else:
+                        oldMat = self.cubies[i].findMaterial("Front")
+                        self.cubies[i].replaceMaterial(oldMat, black)
+                    if(y == 0):
+                        oldMat = self.cubies[i].findMaterial("Back")
+                        self.cubies[i].replaceMaterial(oldMat, green)
+                    else:
+                        oldMat = self.cubies[i].findMaterial("Back")
+                        self.cubies[i].replaceMaterial(oldMat, black)
+                    if(x == 2):
+                        oldMat = self.cubies[i].findMaterial("Left")
+                        self.cubies[i].replaceMaterial(oldMat, orange)
+                    else:
+                        oldMat = self.cubies[i].findMaterial("Left")
+                        self.cubies[i].replaceMaterial(oldMat, black)
+                    if(x == 0):
+                        oldMat = self.cubies[i].findMaterial("Right")
+                        self.cubies[i].replaceMaterial(oldMat, red)
+                    else:
+                        oldMat = self.cubies[i].findMaterial("Right")
+                        self.cubies[i].replaceMaterial(oldMat, black)
+                    
+                    i = i + 1
+                    # print(str(i) + ":" + str(x) + ", " + str(y) + ", " + str(z) + ":" + cubieType)
 
     def setupLights(self):
         ambientLight = AmbientLight("ambientLight")
@@ -75,8 +150,18 @@ class MagicPandaCube(ShowBase):
         directionalLight = DirectionalLight("directionalLight")
         directionalLight.setDirection(LVector3(0, 45, -45))
         directionalLight.setColor((0.2, 0.2, 0.2, 1))
-        render.setLight(render.attachNewNode(directionalLight))
-        render.setLight(render.attachNewNode(ambientLight))
+        builtins.render.setLight(builtins.render.attachNewNode(directionalLight))
+        builtins.render.setLight(builtins.render.attachNewNode(ambientLight))
+
+    def changeCameraXY(self, cPosition):
+        self.cameraPosition = (self.cameraPosition + cPosition) % 4
+        builtins.camera.setPos(CAMERAPOS[self.cameraPosition])
+        builtins.camera.lookAt(0, 0, 0)
+
+    def changeCameraZ(self, cPosition):
+        currentPos = builtins.camera.getPos()
+        builtins.camera.setPos(currentPos[0], currentPos[1], cPosition * CAMERADIST)
+        builtins.camera.lookAt(0, 0, 0)
 
 app = MagicPandaCube()
 app.run()
