@@ -1,12 +1,14 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import AmbientLight, DirectionalLight
-from panda3d.core import LVector3, Vec4
+from panda3d.core import LVector3, Vec3, Vec4
 from panda3d.core import Material
 from panda3d.core import Texture
 from panda3d.core import NodePath
 from direct.gui.DirectGui import OnscreenText
+from direct.interval.LerpInterval import LerpHprInterval
 import sys
 import builtins
+import math
 
 # Camera constants
 CAMERADIST = 8
@@ -42,7 +44,6 @@ class MagicPandaCube(ShowBase):
 
         self.accept('escape', sys.exit)  # Escape quits
         self.accept('q', sys.exit)  # Escape quits
-        self.accept('Q', sys.exit)  # Escape quits
         builtins.base.disableMouse()
         self.cameraPosition = 0
         builtins.camera.setPos(CAMERAPOS[self.cameraPosition])
@@ -52,10 +53,17 @@ class MagicPandaCube(ShowBase):
         self.loadModels()
         self.setupLights()
 
-        self.accept("arrow_right", self.changeCameraXY, [1])
-        self.accept("arrow_left", self.changeCameraXY, [-1])
+        self.accept("arrow_right", self.rotateCube, [90])
+        self.accept("arrow_left", self.rotateCube, [-90])
         self.accept("arrow_up", self.changeCameraZ, [-1])
         self.accept("arrow_down", self.changeCameraZ, [1])
+
+        self.accept("p", self.printCoords)
+
+        self.accept("f", self.rotateSlice, [1, 1, 0, 0, 90])
+        self.accept("shift-f", self.rotateSlice, [1, 1, 0, 0, -90])
+        self.accept("r", self.rotateSlice, [0, 1, 0, 90, 0])
+        self.accept("shift-r", self.rotateSlice, [0, 1, 0, -90, 0])
 
     def loadModels(self):
         black = Material()
@@ -73,37 +81,18 @@ class MagicPandaCube(ShowBase):
         yellow = Material()
         yellow.setAmbient(hexColor("fecc30"))
 
-        # #Load a corner
-        # self.corner = builtins.loader.loadModel("./corner.egg")
-        # self.corner.reparentTo(builtins.render)
-        # faceMat = self.corner.findMaterial("Face")
-        # self.corner.replaceMaterial(faceMat, blue)
-        # sideMat = self.corner.findMaterial("Side")
-        # self.corner.replaceMaterial(sideMat, blue)
-        # topMat = self.corner.findMaterial("Top")
-        # self.corner.replaceMaterial(topMat, blue)
-
-        # self.edge = builtins.loader.loadModel("./edge.egg")
-        # sideMat = self.edge.findMaterial("Side")
-        # self.edge.replaceMaterial(sideMat, orange)
-        # faceMat = self.edge.findMaterial("Face")
-        # self.edge.replaceMaterial(faceMat, orange)
-
-        # self.center = builtins.loader.loadModel("./center.egg")
-        # faceMat = self.center.findMaterial("Face")
-        # self.center.replaceMaterial(faceMat, yellow)
-
         self.cube = builtins.render.attachNewNode("cube")
-        self.cube.setPos(-1.05, -1.05, -1.05)
         self.cubies = [None for i in range(27)]
         i = 0
         for x in range(3):
             for y in range(3):
                 for z in range(3):
                     cubieType = "cubie"
-                    self.cubies[i] = builtins.loader.loadModel(cubieType)
-                    self.cubies[i].setPos(x * 1.05, y * 1.05, z * 1.05)
-                    self.cubies[i].reparentTo(self.cube)
+                    cubie = builtins.loader.loadModel(cubieType)
+                    cubie.setScale(.95)
+                    cubie.setPos(x - 1, y - 1, z - 1)
+                    self.cubies[i] = self.cube.attachNewNode(cubieType + str(x) + str(y) + str(z))
+                    cubie.reparentTo(self.cubies[i])
                     if(z == 2):
                         oldMat = self.cubies[i].findMaterial("Up")
                         self.cubies[i].replaceMaterial(oldMat, yellow)
@@ -146,11 +135,11 @@ class MagicPandaCube(ShowBase):
 
     def setupLights(self):
         ambientLight = AmbientLight("ambientLight")
-        ambientLight.setColor((.8, .8, .8, 1))
-        directionalLight = DirectionalLight("directionalLight")
-        directionalLight.setDirection(LVector3(0, 45, -45))
-        directionalLight.setColor((0.2, 0.2, 0.2, 1))
-        builtins.render.setLight(builtins.render.attachNewNode(directionalLight))
+        ambientLight.setColor((1, 1, 1, 1))
+        # directionalLight = DirectionalLight("directionalLight")
+        # directionalLight.setDirection(LVector3(0, 45, -45))
+        # directionalLight.setColor((0.2, 0.2, 0.2, 1))
+        # builtins.render.setLight(builtins.render.attachNewNode(directionalLight))
         builtins.render.setLight(builtins.render.attachNewNode(ambientLight))
 
     def changeCameraXY(self, cPosition):
@@ -162,6 +151,31 @@ class MagicPandaCube(ShowBase):
         currentPos = builtins.camera.getPos()
         builtins.camera.setPos(currentPos[0], currentPos[1], cPosition * CAMERADIST)
         builtins.camera.lookAt(0, 0, 0)
+
+    def rotateCube(self, angle):
+        # for cube in self.cubies:
+        #         cube.reparentTo(self.cube)
+        hpr = self.cube.getHpr()
+        i = LerpHprInterval(self.cube, (abs(angle) / 360), (hpr[0] + angle, hpr[1], hpr[2]))
+        i.start()
+
+    def rotateSlice(self, cubePos, cubieCoord, hAngle, pAngle, rAngle):
+        print("Rotate Slice:")
+        for cubieHost in self.cubies:
+            localPos = cubieHost.getChildren()[0].getPos()
+            # pos = builtins.render.getRelativePoint(cubieHost, localPos)
+            pos = localPos
+            if pos[cubePos] == cubieCoord:
+                hpr = cubieHost.getHpr()
+                i = LerpHprInterval(cubieHost, .2, Vec3(hpr[0] + hAngle, hpr[1] + pAngle, hpr[2] + rAngle))
+                i.start()
+
+    def printCoords(self):
+        for cubieHost in self.cubies:
+            # print(cubieHost.getNode(0))
+            pos = cubieHost.getChildren()[0].getPos()
+
+            print(cubieHost.getChildren()[0].getPos())
 
 app = MagicPandaCube()
 app.run()
