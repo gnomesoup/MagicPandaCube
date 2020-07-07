@@ -1,6 +1,6 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import AmbientLight
-from panda3d.core import Vec3, Vec4
+from panda3d.core import Vec3, Vec4, LVector3f
 from panda3d.core import Material
 from direct.gui.DirectGui import OnscreenText
 from direct.interval.LerpInterval import LerpHprInterval
@@ -31,11 +31,13 @@ def hexColor(hex):
     return color
 
 
-def getChildRelativePos(parentNode):
-    child = parentNode.getChildren()[0]
-    localPos = child.getPos()
-    pos = builtins.render.getRelativePoint(child, localPos)
-    return pos
+def detachWithTransform(childNode):
+    pos = builtins.render.getRelativePoint(childNode, (0, 0, 0))
+    nodeVector = builtins.render.getRelativeVector(childNode, (0, 1, 0))
+    childNode.detachNode()
+    childNode.setPos(pos)
+    childNode.setHpr(nodeVector)
+    return childNode
 
 
 class MagicPandaCube(ShowBase):
@@ -67,11 +69,14 @@ class MagicPandaCube(ShowBase):
         self.accept("arrow_down", self.changeCameraZ, [1])
 
         self.accept("p", self.printCoords)
+        self.accept("x", self.reparentToRender, [self.cubies])
 
         self.accept("f", self.rotateSlice, [1, 1, 0, 0, 90])
         self.accept("shift-f", self.rotateSlice, [1, 1, 0, 0, -90])
         self.accept("r", self.rotateSlice, [0, 1, 0, 90, 0])
         self.accept("shift-r", self.rotateSlice, [0, 1, 0, -90, 0])
+
+        print(LVector3f())
 
     def loadModels(self):
         black = Material()
@@ -96,11 +101,10 @@ class MagicPandaCube(ShowBase):
             for y in range(3):
                 for z in range(3):
                     cubieType = "cubie"
-                    cubie = builtins.loader.loadModel(cubieType)
-                    cubie.setScale(.95)
-                    cubie.setPos(x - 1, y - 1, z - 1)
-                    self.cubies[i] = builtins.render.attachNewNode(cubieType + str(x) + str(y) + str(z))
-                    cubie.reparentTo(self.cubies[i])
+                    self.cubies[i] = builtins.loader.loadModel(cubieType)
+                    self.cubies[i].setScale(.95)
+                    self.cubies[i].setPos(x - 1, y - 1, z - 1)
+                    self.cubies[i].reparentTo(render)
                     if(z == 2):
                         oldMat = self.cubies[i].findMaterial("Up")
                         self.cubies[i].replaceMaterial(oldMat, yellow)
@@ -142,10 +146,6 @@ class MagicPandaCube(ShowBase):
     def setupLights(self):
         ambientLight = AmbientLight("ambientLight")
         ambientLight.setColor((1, 1, 1, 1))
-        # directionalLight = DirectionalLight("directionalLight")
-        # directionalLight.setDirection(LVector3(0, 45, -45))
-        # directionalLight.setColor((0.2, 0.2, 0.2, 1))
-        # builtins.render.setLight(builtins.render.attachNewNode(directionalLight))
         builtins.render.setLight(builtins.render.attachNewNode(ambientLight))
 
     def changeCameraXY(self, cPosition):
@@ -160,8 +160,9 @@ class MagicPandaCube(ShowBase):
         builtins.camera.lookAt(0, 0, 0)
 
     def rotateCube(self, angle):
-        # for cube in self.cubies:
-        #         cube.reparentTo(self.cube)
+        for cubie in self.cubies:
+            cubie = detachWithTransform(cubie)
+            cubie.reparentTo(self.cube)
         hpr = self.cube.getHpr()
         i = LerpHprInterval(self.cube, (abs(angle) / 360),
                             (hpr[0] + angle, hpr[1], hpr[2]))
@@ -169,32 +170,43 @@ class MagicPandaCube(ShowBase):
 
     def rotateSlice(self, cubePos, cubieCoord, hAngle, pAngle, rAngle):
         print("Rotate Slice:")
-        for cubieHost in self.cubies:
-            pos = getChildRelativePos(cubieHost)
+        for cubie in self.cubies:
+            cubie = detachWithTransform(cubie)
+            pos = cubie.getPos()
             if int(pos[cubePos]) == cubieCoord:
-                hpr = cubieHost.getHpr()
-                i = LerpHprInterval(cubieHost, .2, Vec3(hpr[0] + hAngle,
-                                                        hpr[1] + pAngle,
-                                                        hpr[2] + rAngle))
-                i.start()
+                cubie.reparentTo(self.cube)
+            else:
+                cubie.reparentTo(builtins.render)
+        hpr = self.cube.getHpr()
+        i = LerpHprInterval(self.cube, .2, Vec3(hpr[0] + hAngle,
+                                                hpr[1] + pAngle,
+                                                hpr[2] + rAngle))
+        i.start()
 
     def printCoords(self):
         self.flashGroups()
-        for cubieHost in self.cubies:
+        for cubie in self.cubies:
             # print(cubieHost.getNode(0))
-            pos = getChildRelativePos(cubieHost)
             print("Global:" + str(pos) + " " + str(int(pos[1])))
 
     def flashGroups(self):
         flashOn = Parallel(name="FlashGroupOn")
         flashOff = Parallel(name="FlashGroupOff")
-        for cubieHost in self.cubies:
-            pos = getChildRelativePos(cubieHost)
+        for cubie in self.cubies:
+            cubie = detachWithTransform(cubie)
+            pos = cubie.getPos()
             if int(pos[1]) == 1:
-                flashOn.append(LerpScaleInterval(cubieHost, .2, 1.1))
-                flashOff.append(LerpScaleInterval(cubieHost, .2, 1))
+                cubie.reparentTo(self.cube)
+        flashOn.append(LerpScaleInterval(self.cube, .2, 1.1))
+        flashOff.append(LerpScaleInterval(self.cube, .2, 1))
         flashGroup = Sequence(flashOn, flashOff, name="FlashGroupOnOff")
         flashGroup.start()
+
+    def reparentToRender(self, nodeList):
+        for item in nodeList:
+            item = detachWithTransform(item)
+            item.reparentTo(builtins.render)
+        print("Reparented")
 
 
 app = MagicPandaCube()
