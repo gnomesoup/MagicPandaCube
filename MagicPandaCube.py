@@ -1,23 +1,23 @@
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import AmbientLight, DirectionalLight
-from panda3d.core import LVector3, Vec3, Vec4
+from panda3d.core import AmbientLight
+from panda3d.core import Vec3, Vec4
 from panda3d.core import Material
-from panda3d.core import Texture
-from panda3d.core import NodePath
 from direct.gui.DirectGui import OnscreenText
 from direct.interval.LerpInterval import LerpHprInterval
+from direct.interval.LerpInterval import LerpScaleInterval
+from direct.interval.IntervalGlobal import Sequence, Parallel
 import sys
 import builtins
-import math
 
 # Camera constants
 CAMERADIST = 8
 CAMERAPOS = (
     (-CAMERADIST, CAMERADIST, CAMERADIST),
     (-CAMERADIST, -CAMERADIST, CAMERADIST),
-    (CAMERADIST, -CAMERADIST, CAMERADIST), 
+    (CAMERADIST, -CAMERADIST, CAMERADIST),
     (CAMERADIST, CAMERADIST, CAMERADIST)
     )
+
 
 def hexColor(hex):
     if len(hex) < 8:
@@ -29,6 +29,14 @@ def hexColor(hex):
     for i in range(4):
         color[i] = int("0x" + hc[i], 16) / 255
     return color
+
+
+def getChildRelativePos(parentNode):
+    child = parentNode.getChildren()[0]
+    localPos = child.getPos()
+    pos = builtins.render.getRelativePoint(child, localPos)
+    return pos
+
 
 class MagicPandaCube(ShowBase):
 
@@ -91,7 +99,7 @@ class MagicPandaCube(ShowBase):
                     cubie = builtins.loader.loadModel(cubieType)
                     cubie.setScale(.95)
                     cubie.setPos(x - 1, y - 1, z - 1)
-                    self.cubies[i] = self.cube.attachNewNode(cubieType + str(x) + str(y) + str(z))
+                    self.cubies[i] = builtins.render.attachNewNode(cubieType + str(x) + str(y) + str(z))
                     cubie.reparentTo(self.cubies[i])
                     if(z == 2):
                         oldMat = self.cubies[i].findMaterial("Up")
@@ -129,9 +137,7 @@ class MagicPandaCube(ShowBase):
                     else:
                         oldMat = self.cubies[i].findMaterial("Right")
                         self.cubies[i].replaceMaterial(oldMat, black)
-                    
                     i = i + 1
-                    # print(str(i) + ":" + str(x) + ", " + str(y) + ", " + str(z) + ":" + cubieType)
 
     def setupLights(self):
         ambientLight = AmbientLight("ambientLight")
@@ -149,33 +155,47 @@ class MagicPandaCube(ShowBase):
 
     def changeCameraZ(self, cPosition):
         currentPos = builtins.camera.getPos()
-        builtins.camera.setPos(currentPos[0], currentPos[1], cPosition * CAMERADIST)
+        builtins.camera.setPos(currentPos[0], currentPos[1],
+                               cPosition * CAMERADIST)
         builtins.camera.lookAt(0, 0, 0)
 
     def rotateCube(self, angle):
         # for cube in self.cubies:
         #         cube.reparentTo(self.cube)
         hpr = self.cube.getHpr()
-        i = LerpHprInterval(self.cube, (abs(angle) / 360), (hpr[0] + angle, hpr[1], hpr[2]))
+        i = LerpHprInterval(self.cube, (abs(angle) / 360),
+                            (hpr[0] + angle, hpr[1], hpr[2]))
         i.start()
 
     def rotateSlice(self, cubePos, cubieCoord, hAngle, pAngle, rAngle):
         print("Rotate Slice:")
         for cubieHost in self.cubies:
-            localPos = cubieHost.getChildren()[0].getPos()
-            # pos = builtins.render.getRelativePoint(cubieHost, localPos)
-            pos = localPos
-            if pos[cubePos] == cubieCoord:
+            pos = getChildRelativePos(cubieHost)
+            if int(pos[cubePos]) == cubieCoord:
                 hpr = cubieHost.getHpr()
-                i = LerpHprInterval(cubieHost, .2, Vec3(hpr[0] + hAngle, hpr[1] + pAngle, hpr[2] + rAngle))
+                i = LerpHprInterval(cubieHost, .2, Vec3(hpr[0] + hAngle,
+                                                        hpr[1] + pAngle,
+                                                        hpr[2] + rAngle))
                 i.start()
 
     def printCoords(self):
+        self.flashGroups()
         for cubieHost in self.cubies:
             # print(cubieHost.getNode(0))
-            pos = cubieHost.getChildren()[0].getPos()
+            pos = getChildRelativePos(cubieHost)
+            print("Global:" + str(pos) + " " + str(int(pos[1])))
 
-            print(cubieHost.getChildren()[0].getPos())
+    def flashGroups(self):
+        flashOn = Parallel(name="FlashGroupOn")
+        flashOff = Parallel(name="FlashGroupOff")
+        for cubieHost in self.cubies:
+            pos = getChildRelativePos(cubieHost)
+            if int(pos[1]) == 1:
+                flashOn.append(LerpScaleInterval(cubieHost, .2, 1.1))
+                flashOff.append(LerpScaleInterval(cubieHost, .2, 1))
+        flashGroup = Sequence(flashOn, flashOff, name="FlashGroupOnOff")
+        flashGroup.start()
+
 
 app = MagicPandaCube()
 app.run()
