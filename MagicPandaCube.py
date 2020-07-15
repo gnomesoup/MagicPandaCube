@@ -1,22 +1,23 @@
-from direct.showbase.ShowBase import ShowBase
+import builtins
 from panda3d.core import AmbientLight
-from panda3d.core import Vec3, Vec4, LVector3f
+from panda3d.core import Vec3, Vec4, Plane, Point3
 from panda3d.core import Material
+from panda3d.core import CollisionTraverser
+from panda3d.core import CollisionHandlerQueue
+from panda3d.core import CollisionNode
+from panda3d.core import CollisionSphere
+from panda3d.core import CollisionPlane
+from panda3d.core import NodePathCollection
 from direct.gui.DirectGui import OnscreenText
 from direct.interval.LerpInterval import LerpHprInterval
 from direct.interval.LerpInterval import LerpScaleInterval
-from direct.interval.IntervalGlobal import Sequence, Parallel
+from direct.interval.IntervalGlobal import Sequence
+from direct.showbase.ShowBase import ShowBase
+from panda3d.core import GeomNode
 import sys
-import builtins
 
 # Camera constants
 CAMERADIST = 8
-CAMERAPOS = (
-    (-CAMERADIST, CAMERADIST, CAMERADIST),
-    (-CAMERADIST, -CAMERADIST, CAMERADIST),
-    (CAMERADIST, -CAMERADIST, CAMERADIST),
-    (CAMERADIST, CAMERADIST, CAMERADIST)
-    )
 
 
 def hexColor(hex):
@@ -31,183 +32,219 @@ def hexColor(hex):
     return color
 
 
-def detachWithTransform(childNode):
-    pos = builtins.render.getRelativePoint(childNode, (0, 0, 0))
-    nodeVector = builtins.render.getRelativeVector(childNode, (0, 1, 0))
-    childNode.detachNode()
-    childNode.setPos(pos)
-    childNode.setHpr(nodeVector)
-    return childNode
+# Materials
+black = Material()
+black.setAmbient((0, 0, 0, 1))
+white = Material()
+white.setAmbient((1, 1, 1, 1))
+blue = Material()
+blue.setAmbient(hexColor("40a4d8"))
+red = Material()
+red.setAmbient(hexColor("db3837"))
+green = Material()
+green.setAmbient(hexColor("b2c225"))
+orange = Material()
+orange.setAmbient(hexColor("f4941f"))
+yellow = Material()
+yellow.setAmbient(hexColor("fecc30"))
 
 
-class MagicPandaCube(ShowBase):
-
-    def __init__(self):
-        ShowBase.__init__(self)
-
-        self.title = OnscreenText(text="Rubik's Cube Simulator",
-                                  parent=builtins.base.a2dBottomCenter,
-                                  fg=(1, 1, 1, 1),
-                                  shadow=(0, 0, 0, .5),
-                                  pos=(0, .1),
-                                  scale=.1)
-
-        self.accept('escape', sys.exit)  # Escape quits
-        self.accept('q', sys.exit)  # Escape quits
-        builtins.base.disableMouse()
-        self.cameraPosition = 0
-        builtins.camera.setPos(CAMERAPOS[self.cameraPosition])
-        builtins.camera.lookAt(0, 0, 0)
-        builtins.base.camLens.setNear(1)
-
-        self.loadModels()
-        self.setupLights()
-
-        self.accept("arrow_right", self.rotateCube, [90])
-        self.accept("arrow_left", self.rotateCube, [-90])
-        self.accept("arrow_up", self.changeCameraZ, [-1])
-        self.accept("arrow_down", self.changeCameraZ, [1])
-
-        self.accept("p", self.printCoords)
-        self.accept("x", self.reparentToRender, [self.cubies])
-
-        self.accept("f", self.rotateSlice, [1, 1, 0, 0, 90])
-        self.accept("shift-f", self.rotateSlice, [1, 1, 0, 0, -90])
-        self.accept("r", self.rotateSlice, [0, 1, 0, 90, 0])
-        self.accept("shift-r", self.rotateSlice, [0, 1, 0, -90, 0])
-
-        print(LVector3f())
-
-    def loadModels(self):
-        black = Material()
-        black.setAmbient((0, 0, 0, 1))
-        white = Material()
-        white.setAmbient((1, 1, 1, 1))
-        blue = Material()
-        blue.setAmbient(hexColor("40a4d8"))
-        red = Material()
-        red.setAmbient(hexColor("db3837"))
-        green = Material()
-        green.setAmbient(hexColor("b2c225"))
-        orange = Material()
-        orange.setAmbient(hexColor("f4941f"))
-        yellow = Material()
-        yellow.setAmbient(hexColor("fecc30"))
-
-        self.cube = builtins.render.attachNewNode("cube")
-        self.cubies = [None for i in range(27)]
-        i = 0
-        for x in range(3):
-            for y in range(3):
-                for z in range(3):
-                    cubieType = "cubie"
-                    self.cubies[i] = builtins.loader.loadModel(cubieType)
-                    self.cubies[i].setScale(.95)
-                    self.cubies[i].setPos(x - 1, y - 1, z - 1)
-                    self.cubies[i].reparentTo(render)
-                    if(z == 2):
-                        oldMat = self.cubies[i].findMaterial("Up")
-                        self.cubies[i].replaceMaterial(oldMat, yellow)
-                    else:
-                        oldMat = self.cubies[i].findMaterial("Up")
-                        self.cubies[i].replaceMaterial(oldMat, black)
-                    if(z == 0):
-                        oldMat = self.cubies[i].findMaterial("Down")
-                        self.cubies[i].replaceMaterial(oldMat, white)
-                    else:
-                        oldMat = self.cubies[i].findMaterial("Down")
-                        self.cubies[i].replaceMaterial(oldMat, black)
-                    if(y == 2):
-                        oldMat = self.cubies[i].findMaterial("Front")
-                        self.cubies[i].replaceMaterial(oldMat, blue)
-                    else:
-                        oldMat = self.cubies[i].findMaterial("Front")
-                        self.cubies[i].replaceMaterial(oldMat, black)
-                    if(y == 0):
-                        oldMat = self.cubies[i].findMaterial("Back")
-                        self.cubies[i].replaceMaterial(oldMat, green)
-                    else:
-                        oldMat = self.cubies[i].findMaterial("Back")
-                        self.cubies[i].replaceMaterial(oldMat, black)
-                    if(x == 2):
-                        oldMat = self.cubies[i].findMaterial("Left")
-                        self.cubies[i].replaceMaterial(oldMat, orange)
-                    else:
-                        oldMat = self.cubies[i].findMaterial("Left")
-                        self.cubies[i].replaceMaterial(oldMat, black)
-                    if(x == 0):
-                        oldMat = self.cubies[i].findMaterial("Right")
-                        self.cubies[i].replaceMaterial(oldMat, red)
-                    else:
-                        oldMat = self.cubies[i].findMaterial("Right")
-                        self.cubies[i].replaceMaterial(oldMat, black)
-                    i = i + 1
-
-    def setupLights(self):
-        ambientLight = AmbientLight("ambientLight")
-        ambientLight.setColor((1, 1, 1, 1))
-        builtins.render.setLight(builtins.render.attachNewNode(ambientLight))
-
-    def changeCameraXY(self, cPosition):
-        self.cameraPosition = (self.cameraPosition + cPosition) % 4
-        builtins.camera.setPos(CAMERAPOS[self.cameraPosition])
-        builtins.camera.lookAt(0, 0, 0)
-
-    def changeCameraZ(self, cPosition):
-        currentPos = builtins.camera.getPos()
-        builtins.camera.setPos(currentPos[0], currentPos[1],
-                               cPosition * CAMERADIST)
-        builtins.camera.lookAt(0, 0, 0)
-
-    def rotateCube(self, angle):
-        for cubie in self.cubies:
-            cubie = detachWithTransform(cubie)
-            cubie.reparentTo(self.cube)
-        hpr = self.cube.getHpr()
-        i = LerpHprInterval(self.cube, (abs(angle) / 360),
-                            (hpr[0] + angle, hpr[1], hpr[2]))
-        i.start()
-
-    def rotateSlice(self, cubePos, cubieCoord, hAngle, pAngle, rAngle):
-        print("Rotate Slice:")
-        for cubie in self.cubies:
-            cubie = detachWithTransform(cubie)
-            pos = cubie.getPos()
-            if int(pos[cubePos]) == cubieCoord:
-                cubie.reparentTo(self.cube)
-            else:
-                cubie.reparentTo(builtins.render)
-        hpr = self.cube.getHpr()
-        i = LerpHprInterval(self.cube, .2, Vec3(hpr[0] + hAngle,
-                                                hpr[1] + pAngle,
-                                                hpr[2] + rAngle))
-        i.start()
-
-    def printCoords(self):
-        self.flashGroups()
-        for cubie in self.cubies:
-            # print(cubieHost.getNode(0))
-            print("Global:" + str(pos) + " " + str(int(pos[1])))
-
-    def flashGroups(self):
-        flashOn = Parallel(name="FlashGroupOn")
-        flashOff = Parallel(name="FlashGroupOff")
-        for cubie in self.cubies:
-            cubie = detachWithTransform(cubie)
-            pos = cubie.getPos()
-            if int(pos[1]) == 1:
-                cubie.reparentTo(self.cube)
-        flashOn.append(LerpScaleInterval(self.cube, .2, 1.1))
-        flashOff.append(LerpScaleInterval(self.cube, .2, 1))
-        flashGroup = Sequence(flashOn, flashOff, name="FlashGroupOnOff")
-        flashGroup.start()
-
-    def reparentToRender(self, nodeList):
-        for item in nodeList:
-            item = detachWithTransform(item)
-            item.reparentTo(builtins.render)
-        print("Reparented")
+def colorIf(cObject, cDirection, cMaterial, eMaterial, cCoord, cIndex):
+    oldMat = cObject.findMaterial(cDirection)
+    if cCoord == cIndex:
+        cObject.replaceMaterial(oldMat, cMaterial)
+    else:
+        cObject.replaceMaterial(oldMat, eMaterial)
 
 
-app = MagicPandaCube()
+app = ShowBase()
+app.title = OnscreenText(text="Rubik's Cube Simulator",
+                              parent=builtins.base.a2dBottomCenter,
+                              fg=(1, 1, 1, 1),
+                              shadow=(0, 0, 0, .5),
+                              pos=(0, .1),
+                              scale=.1)
+
+builtins.base.disableMouse()
+# builtins.camera.setPos(CAMERADIST, CAMERADIST * .75, CAMERADIST)
+builtins.camera.setPos(-CAMERADIST * .75, CAMERADIST, CAMERADIST)
+builtins.camera.lookAt(0, 0, 0)
+cameraRig = builtins.render.attachNewNode("CameraRig")
+builtins.camera.reparentTo(cameraRig)
+
+ambientLight = AmbientLight("ambientLight")
+ambientLight.setColor((1, 1, 1, 1))
+builtins.render.setLight(builtins.render.attachNewNode(ambientLight))
+
+collisionTraverser = CollisionTraverser()
+# builtins.base.cTrav = collisionTraverser
+
+collisionHandler = CollisionHandlerQueue()
+
+sliceTypes = {"Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
+              "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
+              "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
+              "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
+              "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
+              "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
+              "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
+              "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
+              "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0))}
+
+
+collisionSliceHolder = cameraRig.attachNewNode("collisionSlices")
+collisionSlices = [None for i in range(len(sliceTypes))]
+for i in range(len(sliceTypes)):
+    sliceType = list(sliceTypes.keys())[i]
+    cNode = CollisionNode(sliceType)
+    collisionSlices[i] = collisionSliceHolder.attachNewNode(cNode)
+    cNode.addSolid(CollisionPlane(sliceTypes[sliceType]))
+    collisionSlices[i].setTag("sliceType", sliceType)
+    # cNode.setFromCollideMask(GeomNode.getDefaultCollideMask())
+
+cubies = [None for i in range(27)]
+cubieCollisions = [None for i in range(27)]
+i = 0
+for x in range(3):
+    for y in range(3):
+        for z in range(3):
+            pos = Vec3(x - 1, y - 1, z - 1)
+            nodeName = "cubie" + str(x) + str(y) + str(z)
+            cubies[i] = builtins.loader.loadModel("cubie")
+            nodeName = "collision" + str(x) + str(y) + str(z)
+            cNode = CollisionNode(nodeName)
+            cNode.addSolid(CollisionSphere(0, 0, 0, .5))
+            cubieCollisions[i] = cubies[i].attachNewNode(cNode)
+            cubies[i].setPos(pos)
+            cubies[i].setScale(.95)
+            cubies[i].reparentTo(builtins.render)
+            collisionTraverser.addCollider(cubieCollisions[i],
+                                           collisionHandler)
+            colorIf(cubies[i], "Up", yellow, black, z, 2)
+            colorIf(cubies[i], "Down", white, black, z, 0)
+            colorIf(cubies[i], "Front", blue, black, y, 2)
+            colorIf(cubies[i], "Back", green, black, y, 0)
+            colorIf(cubies[i], "Left", orange, black, x, 2)
+            colorIf(cubies[i], "Right", red, black, x, 0)
+            i = i + 1
+
+tempNode = cameraRig.attachNewNode("tempNode")
+
+
+def reparentToRender(task):
+    print("ReparentToRender")
+    global cubies
+    # for cubie in cubies:
+    #     cubie.wrtReparentTo(builtins.render)
+    #     cubie.setScale(.95)
+    # tNode = builtins.render.find("tempNode")
+    # tNode.removeNode()
+
+
+def getCollisionCollection(sliceType):
+    ignoreSlice = None
+    collisionCollection = NodePathCollection()
+    collisionTraverser.traverse(collisionSliceHolder)
+    collisionCount = collisionHandler.getNumEntries()
+    # check if the slice is internal
+    sliceKeys = list(sliceTypes.keys())
+    sliceIndex = sliceKeys.index(sliceType)
+    if sliceIndex % 3 == 2:
+        ignoreSlice = sliceKeys[sliceIndex - 1]
+        print(ignoreSlice)
+    for i in range(collisionCount):
+        intoNode = collisionHandler.getEntry(i).getIntoNodePath()
+        tag = intoNode.findNetTag("sliceType")
+        if str(tag).endswith(sliceType):
+            fromNode = collisionHandler.getEntry(i).getFromNodePath()
+            collisionCollection.addPath(fromNode.getParent())
+    if ignoreSlice:
+        for i in range(collisionCount):
+            intoNode = collisionHandler.getEntry(i).getIntoNodePath()
+            tag = intoNode.findNetTag("sliceType")
+            if str(tag).endswith(ignoreSlice):
+                fromNode = collisionHandler.getEntry(i).getFromNodePath()
+                collisionCollection.removePath(fromNode.getParent())
+    return collisionCollection
+
+
+def rotateSlice(sliceType, hAngle, pAngle, rAngle, task):
+    print("Rotate Slice: " + sliceType)
+    children = tempNode.getChildren()
+    children.wrtReparentTo(builtins.render)
+    tempNode.clearTransform()
+    nodes = getCollisionCollection(sliceType)
+    nodes.wrtReparentTo(tempNode)
+    # for cubie in cubies:
+    #     pos = cameraRig.getPos(cubie)
+    #     if int(pos[cubePos]) == cubieCoord:
+    #         cubie.wrtReparentTo(tempNode)
+    i = LerpHprInterval(tempNode, .2, Vec3(hAngle, pAngle, rAngle))
+    i.start()
+
+
+def rotateSliceTask(sliceType, hAngle, pAngle, rAngle):
+    builtins.taskMgr.add(rotateSlice, "rotateSlice",
+                         extraArgs=[sliceType,
+                                    hAngle,
+                                    pAngle,
+                                    rAngle],
+                         appendTask=True)
+
+
+def rotateCamera(hAngle, pAngle, rAngle):
+    print("Rotate Camera")
+    tempNode.getChildren().wrtReparentTo(builtins.render)
+    hpr = cameraRig.getHpr(builtins.render)
+    i = LerpHprInterval(cameraRig, .1, Vec3(
+                        hpr[0] + hAngle,
+                        hpr[1] + pAngle,
+                        hpr[2] + rAngle))
+    i.start()
+
+
+def onSpace():
+    print("onSpace")
+    flashRows = Sequence(name="flashRows")
+    tempNode.getChildren().wrtReparentTo(builtins.render)
+    tempNode.clearTransform()
+    getCollisionCollection("Front").wrtReparentTo(tempNode)
+    scaleBigger = LerpScaleInterval(tempNode, .2, 1.1)
+    scaleOriginal = LerpScaleInterval(tempNode, .2, 1)
+    flashRows.append(scaleBigger)
+    flashRows.append(scaleOriginal)
+    flashRows.start()
+
+
+app.accept("q", sys.exit)
+app.accept("space", onSpace)
+app.accept("arrow_left", rotateCamera, [-90, 0, 0])
+app.accept("arrow_right", rotateCamera, [90, 0, 0])
+app.accept("arrow_up", rotateCamera, [0, 0, 90])
+app.accept("arrow_down", rotateCamera, [0, 0, -90])
+app.accept("x", rotateCamera, [0, -90, 0])
+app.accept("shift-x", rotateCamera, [0, 90, 0])
+app.accept("y", rotateCamera, [0, 0, -90])
+app.accept("shift-y", rotateCamera, [0, 0, 90])
+app.accept("z", rotateCamera, [0, -90, 0])
+app.accept("shift-z", rotateCamera, [0, 90, 0])
+app.accept("r", rotateSliceTask, ["Right", 0, 90, 0])
+app.accept("shift-r", rotateSliceTask, ["Right", 0, -90, 0])
+app.accept("l", rotateSliceTask, ["Left", 0, -90, 0])
+app.accept("shift-l", rotateSliceTask, ["Left", 0, 90, 0])
+app.accept("m", rotateSliceTask, ["Middle", 0, 90, 0])
+app.accept("shift-m", rotateSliceTask, ["Middle", 0, -90, 0])
+app.accept("f", rotateSliceTask, ["Front", 0, 0, -90])
+app.accept("shift-f", rotateSliceTask, ["Front", 0, 0, 90])
+app.accept("b", rotateSliceTask, ["Back", 0, 0, 90])
+app.accept("shift-b", rotateSliceTask, ["Back", 0, 0, -90])
+app.accept("s", rotateSliceTask, ["Standing", 0, 0, -90])
+app.accept("shift-s", rotateSliceTask, ["Standing", 0, 0, 90])
+app.accept("u", rotateSliceTask, ["Up", -90, 0, 0])
+app.accept("shift-u", rotateSliceTask, ["Up", 90, 0, 0])
+app.accept("d", rotateSliceTask, ["Down", -90, 0, 0])
+app.accept("shift-d", rotateSliceTask, ["Down", 90, 0, 0])
+app.accept("e", rotateSliceTask, ["Equator", -90, 0, 0])
+app.accept("shift-e", rotateSliceTask, ["Equator", 90, 0, 0])
+
 app.run()
