@@ -11,10 +11,10 @@ from panda3d.core import NodePathCollection
 from direct.gui.DirectGui import OnscreenText
 from direct.interval.LerpInterval import LerpHprInterval
 from direct.interval.LerpInterval import LerpScaleInterval
-from direct.interval.IntervalGlobal import Sequence
+from direct.interval.IntervalGlobal import Sequence, Wait
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import GeomNode
 import sys
+import random
 
 # Camera constants
 CAMERADIST = 8
@@ -58,16 +58,18 @@ def colorIf(cObject, cDirection, cMaterial, eMaterial, cCoord, cIndex):
 
 
 app = ShowBase()
-app.title = OnscreenText(text="Rubik's Cube Simulator",
-                              parent=builtins.base.a2dBottomCenter,
-                              fg=(1, 1, 1, 1),
-                              shadow=(0, 0, 0, .5),
-                              pos=(0, .1),
-                              scale=.1)
+app.title = OnscreenText(
+    text="Rubik's Cube Simulator",
+    parent=builtins.base.a2dBottomCenter,
+    fg=(1, 1, 1, 1),
+    shadow=(0, 0, 0, 0.5),
+    pos=(0, 0.1),
+    scale=0.1,
+)
 
 builtins.base.disableMouse()
 # builtins.camera.setPos(CAMERADIST, CAMERADIST * .75, CAMERADIST)
-builtins.camera.setPos(-CAMERADIST * .75, CAMERADIST, CAMERADIST)
+builtins.camera.setPos(-CAMERADIST * 0.75, CAMERADIST, CAMERADIST)
 builtins.camera.lookAt(0, 0, 0)
 cameraRig = builtins.render.attachNewNode("CameraRig")
 builtins.camera.reparentTo(cameraRig)
@@ -81,15 +83,17 @@ collisionTraverser = CollisionTraverser()
 
 collisionHandler = CollisionHandlerQueue()
 
-sliceTypes = {"Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
-              "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
-              "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
-              "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
-              "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
-              "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
-              "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
-              "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
-              "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0))}
+sliceTypes = {
+    "Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
+    "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
+    "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
+    "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
+    "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
+    "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
+    "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
+    "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
+    "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0)),
+}
 
 
 collisionSliceHolder = cameraRig.attachNewNode("collisionSlices")
@@ -113,13 +117,12 @@ for x in range(3):
             cubies[i] = builtins.loader.loadModel("cubie")
             nodeName = "collision" + str(x) + str(y) + str(z)
             cNode = CollisionNode(nodeName)
-            cNode.addSolid(CollisionSphere(0, 0, 0, .5))
+            cNode.addSolid(CollisionSphere(0, 0, 0, 0.5))
             cubieCollisions[i] = cubies[i].attachNewNode(cNode)
             cubies[i].setPos(pos)
-            cubies[i].setScale(.95)
+            cubies[i].setScale(0.95)
             cubies[i].reparentTo(builtins.render)
-            collisionTraverser.addCollider(cubieCollisions[i],
-                                           collisionHandler)
+            collisionTraverser.addCollider(cubieCollisions[i], collisionHandler)
             colorIf(cubies[i], "Up", yellow, black, z, 2)
             colorIf(cubies[i], "Down", white, black, z, 0)
             colorIf(cubies[i], "Front", blue, black, y, 2)
@@ -131,19 +134,11 @@ for x in range(3):
 tempNode = cameraRig.attachNewNode("tempNode")
 
 
-def reparentToRender(task):
-    print("ReparentToRender")
-    global cubies
-    # for cubie in cubies:
-    #     cubie.wrtReparentTo(builtins.render)
-    #     cubie.setScale(.95)
-    # tNode = builtins.render.find("tempNode")
-    # tNode.removeNode()
-
-
 def getCollisionCollection(sliceType):
     ignoreSlice = None
+    # create a collection of nodes that motch
     collisionCollection = NodePathCollection()
+    # run the check for collisions
     collisionTraverser.traverse(collisionSliceHolder)
     collisionCount = collisionHandler.getNumEntries()
     # check if the slice is internal
@@ -151,13 +146,14 @@ def getCollisionCollection(sliceType):
     sliceIndex = sliceKeys.index(sliceType)
     if sliceIndex % 3 == 2:
         ignoreSlice = sliceKeys[sliceIndex - 1]
-        print(ignoreSlice)
+    # go through the collisions an check for a match
     for i in range(collisionCount):
         intoNode = collisionHandler.getEntry(i).getIntoNodePath()
         tag = intoNode.findNetTag("sliceType")
         if str(tag).endswith(sliceType):
             fromNode = collisionHandler.getEntry(i).getFromNodePath()
             collisionCollection.addPath(fromNode.getParent())
+    # remove extra nodes if the slice is an internal one
     if ignoreSlice:
         for i in range(collisionCount):
             intoNode = collisionHandler.getEntry(i).getIntoNodePath()
@@ -165,52 +161,120 @@ def getCollisionCollection(sliceType):
             if str(tag).endswith(ignoreSlice):
                 fromNode = collisionHandler.getEntry(i).getFromNodePath()
                 collisionCollection.removePath(fromNode.getParent())
+    # return the matched collisions
     return collisionCollection
 
 
-def rotateSlice(sliceType, hAngle, pAngle, rAngle, task):
-    print("Rotate Slice: " + sliceType)
+def rotateSlice(sliceType, hAngle, pAngle, rAngle):
     children = tempNode.getChildren()
     children.wrtReparentTo(builtins.render)
     tempNode.clearTransform()
     nodes = getCollisionCollection(sliceType)
     nodes.wrtReparentTo(tempNode)
-    # for cubie in cubies:
-    #     pos = cameraRig.getPos(cubie)
-    #     if int(pos[cubePos]) == cubieCoord:
-    #         cubie.wrtReparentTo(tempNode)
-    i = LerpHprInterval(tempNode, .2, Vec3(hAngle, pAngle, rAngle))
-    i.start()
+    i = LerpHprInterval(tempNode, 0.2, Vec3(hAngle, pAngle, rAngle))
+    return i
+
+
+s = None
 
 
 def rotateSliceTask(sliceType, hAngle, pAngle, rAngle):
-    builtins.taskMgr.add(rotateSlice, "rotateSlice",
-                         extraArgs=[sliceType,
-                                    hAngle,
-                                    pAngle,
-                                    rAngle],
-                         appendTask=True)
+    global s
+    if s:
+        s.finish()
+    i = rotateSlice(sliceType, hAngle, pAngle, rAngle)
+    s = Sequence(i, name="rotate" + sliceType)
+    s.start()
 
 
-def rotateCamera(hAngle, pAngle, rAngle):
-    print("Rotate Camera")
-    tempNode.getChildren().wrtReparentTo(builtins.render)
-    hpr = cameraRig.getHpr(builtins.render)
-    i = LerpHprInterval(cameraRig, .1, Vec3(
-                        hpr[0] + hAngle,
-                        hpr[1] + pAngle,
-                        hpr[2] + rAngle))
-    i.start()
+def rotateCube(hAngle, pAngle, rAngle):
+    if tempNode.getNumChildren() > 0:
+        tempNode.getChildren().wrtReparentTo(builtins.render)
+    tempNode.clearTransform()
+    for cubie in cubies:
+        cubie.wrtReparentTo(tempNode)
+    i = LerpHprInterval(tempNode, 0.1, Vec3(hAngle, pAngle, rAngle))
+    return i
+
+
+def rotateCubeTask(hAngle, pAngle, rAngle):
+    global s
+    if s:
+        s.finish()
+    i = rotateCube(hAngle, pAngle, rAngle)
+    s = Sequence(i, name="roateCube")
+    s.start()
+
+
+rotateSliceArguments = {
+    "U": ["Up", -90, 0, 0],
+    "U'": ["Up", 90, 0, 0],
+    "U2": ["Up", -180, 0, 0],
+    "D": ["Down", -90, 0, 0],
+    "D'": ["Down", 90, 0, 0],
+    "D2": ["Down", -180, 0, 0],
+    "E": ["Equator", -90, 0, 0],
+    "E'": ["Equator", 90, 0, 0],
+    "E2": ["Equator", -180, 0, 0],
+    "F": ["Front", 0, 0, -90],
+    "F'": ["Front", 0, 0, 90],
+    "F2": ["Front", 0, 0, -180],
+    "B": ["Back", 0, 0, 90],
+    "B'": ["Back", 0, 0, -90],
+    "B2": ["Back", 0, 0, 180],
+    "S": ["Standing", 0, 0, -90],
+    "S'": ["Standing", 0, 0, 90],
+    "S2": ["Standing", 0, 0, -180],
+    "L": ["Left", 0, -90, 0],
+    "L'": ["Left", 0, 90, 0],
+    "L2": ["Left", 0, -180, 0],
+    "R": ["Right", 0, 90, 0],
+    "R'": ["Right", 0, -90, 0],
+    "R2": ["Right", 0, 180, 0],
+    "M": ["Middle", 0, 90, 0],
+    "M'": ["Middle", 0, -90, 0],
+    "M2": ["Middle", 0, -180, 0]
+}
+
+
+def randomizeList(num):
+    i = 0
+    outList = []
+    while i < num:
+        r = random.randint(0, num - 1)
+        key = list(rotateSliceArguments.keys())[r]
+        if i > 0 and outList[-1][0] == key[0]:
+            continue
+        i = i + 1
+        outList.append(key)
+    print(outList)
+    return outList
+
+
+def randomizeCube():
+    global s
+    print("Randomize")
+    rotateList = randomizeList(20)
+    i = 0
+    for rotation in rotateList:
+        args = rotateSliceArguments[rotation]
+        builtins.taskMgr.doMethodLater(i * .3, rotateSliceTask,
+                                       name="randomize" + str(i),
+                                       extraArgs=args)
+        i = i + 1
+    return rotateList
 
 
 def onSpace():
     print("onSpace")
     flashRows = Sequence(name="flashRows")
-    tempNode.getChildren().wrtReparentTo(builtins.render)
+    print(tempNode.getNumChildren())
+    if tempNode.getNumChildren() > 0:
+        tempNode.getChildren().wrtReparentTo(builtins.render)
     tempNode.clearTransform()
     getCollisionCollection("Front").wrtReparentTo(tempNode)
-    scaleBigger = LerpScaleInterval(tempNode, .2, 1.1)
-    scaleOriginal = LerpScaleInterval(tempNode, .2, 1)
+    scaleBigger = LerpScaleInterval(tempNode, 0.2, 1.1)
+    scaleOriginal = LerpScaleInterval(tempNode, 0.2, 1)
     flashRows.append(scaleBigger)
     flashRows.append(scaleOriginal)
     flashRows.start()
@@ -218,33 +282,34 @@ def onSpace():
 
 app.accept("q", sys.exit)
 app.accept("space", onSpace)
-app.accept("arrow_left", rotateCamera, [-90, 0, 0])
-app.accept("arrow_right", rotateCamera, [90, 0, 0])
-app.accept("arrow_up", rotateCamera, [0, 0, 90])
-app.accept("arrow_down", rotateCamera, [0, 0, -90])
-app.accept("x", rotateCamera, [0, -90, 0])
-app.accept("shift-x", rotateCamera, [0, 90, 0])
-app.accept("y", rotateCamera, [0, 0, -90])
-app.accept("shift-y", rotateCamera, [0, 0, 90])
-app.accept("z", rotateCamera, [0, -90, 0])
-app.accept("shift-z", rotateCamera, [0, 90, 0])
-app.accept("r", rotateSliceTask, ["Right", 0, 90, 0])
-app.accept("shift-r", rotateSliceTask, ["Right", 0, -90, 0])
-app.accept("l", rotateSliceTask, ["Left", 0, -90, 0])
-app.accept("shift-l", rotateSliceTask, ["Left", 0, 90, 0])
-app.accept("m", rotateSliceTask, ["Middle", 0, 90, 0])
-app.accept("shift-m", rotateSliceTask, ["Middle", 0, -90, 0])
-app.accept("f", rotateSliceTask, ["Front", 0, 0, -90])
-app.accept("shift-f", rotateSliceTask, ["Front", 0, 0, 90])
-app.accept("b", rotateSliceTask, ["Back", 0, 0, 90])
-app.accept("shift-b", rotateSliceTask, ["Back", 0, 0, -90])
-app.accept("s", rotateSliceTask, ["Standing", 0, 0, -90])
-app.accept("shift-s", rotateSliceTask, ["Standing", 0, 0, 90])
-app.accept("u", rotateSliceTask, ["Up", -90, 0, 0])
-app.accept("shift-u", rotateSliceTask, ["Up", 90, 0, 0])
-app.accept("d", rotateSliceTask, ["Down", -90, 0, 0])
-app.accept("shift-d", rotateSliceTask, ["Down", 90, 0, 0])
-app.accept("e", rotateSliceTask, ["Equator", -90, 0, 0])
-app.accept("shift-e", rotateSliceTask, ["Equator", 90, 0, 0])
+app.accept("arrow_left", rotateCubeTask, [-90, 0, 0])
+app.accept("arrow_right", rotateCubeTask, [90, 0, 0])
+app.accept("arrow_up", rotateCubeTask, [0, 90, 0])
+app.accept("arrow_down", rotateCubeTask, [0, -90, 0])
+app.accept("x", rotateCubeTask, [0, 90, 0])
+app.accept("shift-x", rotateCubeTask, [0, -90, 0])
+app.accept("y", rotateCubeTask, [0, 0, -90])
+app.accept("shift-y", rotateCubeTask, [0, 0, 90])
+app.accept("z", rotateCubeTask, [-90, 0, 0])
+app.accept("shift-z", rotateCubeTask, [90, 0, 0])
+app.accept("r", rotateSliceTask, rotateSliceArguments["R"])
+app.accept("shift-r", rotateSliceTask, rotateSliceArguments["R'"])
+app.accept("l", rotateSliceTask, rotateSliceArguments["L"])
+app.accept("shift-l", rotateSliceTask, rotateSliceArguments["L'"])
+app.accept("m", rotateSliceTask, rotateSliceArguments["M"])
+app.accept("shift-m", rotateSliceTask, rotateSliceArguments["M'"])
+app.accept("f", rotateSliceTask, rotateSliceArguments["F"])
+app.accept("shift-f", rotateSliceTask, rotateSliceArguments["F'"])
+app.accept("b", rotateSliceTask, rotateSliceArguments["B"])
+app.accept("shift-b", rotateSliceTask, rotateSliceArguments["B'"])
+app.accept("s", rotateSliceTask, rotateSliceArguments["S"])
+app.accept("shift-s", rotateSliceTask, rotateSliceArguments["S'"])
+app.accept("u", rotateSliceTask, rotateSliceArguments["U"])
+app.accept("shift-u", rotateSliceTask, rotateSliceArguments["U'"])
+app.accept("d", rotateSliceTask, rotateSliceArguments["D"])
+app.accept("shift-d", rotateSliceTask, rotateSliceArguments["D'"])
+app.accept("e", rotateSliceTask, rotateSliceArguments["E"])
+app.accept("shift-e", rotateSliceTask, rotateSliceArguments["E'"])
+app.accept("3", randomizeCube)
 
 app.run()
