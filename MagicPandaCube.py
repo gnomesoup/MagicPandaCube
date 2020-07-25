@@ -15,7 +15,7 @@ from direct.gui.DirectGui import DirectButton
 from direct.gui.DirectGui import DGG
 from direct.interval.LerpInterval import LerpHprInterval
 from direct.interval.LerpInterval import LerpScaleInterval
-from direct.interval.IntervalGlobal import Sequence, Wait
+from direct.interval.IntervalGlobal import Sequence, Func
 from direct.showbase.ShowBase import ShowBase
 import sys
 import random
@@ -37,6 +37,36 @@ def helpDialog():
     gameInfo.show()
 
 
+def cubieSetup():
+    global cubies
+    global cubieCollisions
+    i = 0
+    for x in range(3):
+        for y in range(3):
+            for z in range(3):
+                pos = Vec3(x - 1, y - 1, z - 1)
+                nodeName = "cubie" + str(x) + str(y) + str(z)
+                cubie = builtins.loader.loadModel("cubie")
+                cubie.name = nodeName
+                nodeName = "collision" + str(x) + str(y) + str(z)
+                cNode = CollisionNode(nodeName)
+                cNode.addSolid(CollisionSphere(0, 0, 0, 0.5))
+                cubieCollisions[i] = cubie.attachNewNode(cNode)
+                cubie.setPos(pos)
+                cubie.setScale(0.95)
+                cubie.reparentTo(builtins.render)
+                collisionTraverser.addCollider(cubieCollisions[i],
+                                               collisionHandler)
+                colorIf(cubie, "Up", yellow, black, z, 2)
+                colorIf(cubie, "Down", white, black, z, 0)
+                colorIf(cubie, "Front", blue, black, y, 2)
+                colorIf(cubie, "Back", green, black, y, 0)
+                colorIf(cubie, "Left", orange, black, x, 2)
+                colorIf(cubie, "Right", red, black, x, 0)
+                cubies.addPath(cubie)
+                i = i + 1
+
+
 def randomizeList(num):
     i = 0
     outList = []
@@ -53,6 +83,8 @@ def randomizeList(num):
 
 def randomizeCube():
     global s
+    global taskCount
+    taskCount = 0
     print("Randomize")
     rotateList = randomizeList(20)
     i = 0
@@ -121,8 +153,8 @@ def getCollisionCollection(sliceType):
 
 
 def checkSolved():
+    global s
     solved = True
-    print("checkSolve")
     for i in range(3):
         matchCount = [0, 0, 0]
         matchPos = None
@@ -139,11 +171,21 @@ def checkSolved():
                 for j in range(3):
                     if matchPos[j] == originalPos[j]:
                         matchCount[j] = matchCount[j] + 1
-        print(matchCount)
         if 9 not in matchCount:
             solved = False
     if solved:
+        children = tempNode.getChildren()
+        children.wrtReparentTo(builtins.render)
+        tempNode.clearTransform()
+        cubies.wrtReparentTo(tempNode)
+        if s:
+            s.finish()
+        s = Sequence(LerpScaleInterval(tempNode, 0.2, 1.1),
+                     LerpScaleInterval(tempNode, 0.2, 1),
+                     name="congratulate")
+        s.start()
         print("Solved!")
+    return solved
 
 
 def rotateSlice(sliceType, hAngle, pAngle, rAngle):
@@ -158,11 +200,14 @@ def rotateSlice(sliceType, hAngle, pAngle, rAngle):
 
 def rotateSliceTask(sliceType, hAngle, pAngle, rAngle):
     global s
+    global turnCount
     if s:
         s.finish()
-    i = rotateSlice(sliceType, hAngle, pAngle, rAngle)
-    s = Sequence(i, name="rotate" + sliceType)
+    s = Sequence(rotateSlice(sliceType, hAngle, pAngle, rAngle),
+                 Func(checkSolved),
+                 name="rotate" + sliceType)
     s.start()
+    turnCount = turnCount + 1
 
 
 def rotateCube(hAngle, pAngle, rAngle):
@@ -173,8 +218,7 @@ def rotateCube(hAngle, pAngle, rAngle):
     if tempNode.getNumChildren() > 0:
         tempNode.getChildren().wrtReparentTo(builtins.render)
     tempNode.clearTransform()
-    for cubie in cubies:
-        cubie.wrtReparentTo(tempNode)
+    cubies.wrtReparentTo(tempNode)
     i = LerpHprInterval(tempNode, 0.1, Vec3(hAngle, pAngle, rAngle))
     return i
 
@@ -251,6 +295,15 @@ app.title = OnscreenText(
     scale=0.1,
 )
 
+countText = OnscreenText(
+    text="Turns: 0",
+    parent=builtins.base.a2dTopRight,
+    fg=(1, 1, 1, 1),
+    shadow=(0, 0, 0, 0.5),
+    pos=(-0.1, 0.1),
+    scale=0.5
+)
+
 # Load an image object
 imagePath = "galaxy.jpg"
 background = OnscreenImage(parent=builtins.render2dp, image=imagePath)
@@ -298,32 +351,10 @@ for i in range(len(sliceTypes)):
     collisionSlices[i].setTag("sliceType", sliceType)
     # cNode.setFromCollideMask(GeomNode.getDefaultCollideMask())
 
-cubies = [None for i in range(27)]
+# cubies = [None for i in range(27)]
+cubies = NodePathCollection()
 cubieCollisions = [None for i in range(27)]
-i = 0
-for x in range(3):
-    for y in range(3):
-        for z in range(3):
-            pos = Vec3(x - 1, y - 1, z - 1)
-            nodeName = "cubie" + str(x) + str(y) + str(z)
-            cubies[i] = builtins.loader.loadModel("cubie")
-            cubies[i].name = nodeName
-            nodeName = "collision" + str(x) + str(y) + str(z)
-            cNode = CollisionNode(nodeName)
-            cNode.addSolid(CollisionSphere(0, 0, 0, 0.5))
-            cubieCollisions[i] = cubies[i].attachNewNode(cNode)
-            cubies[i].setPos(pos)
-            cubies[i].setScale(0.95)
-            cubies[i].reparentTo(builtins.render)
-            collisionTraverser.addCollider(cubieCollisions[i],
-                                           collisionHandler)
-            colorIf(cubies[i], "Up", yellow, black, z, 2)
-            colorIf(cubies[i], "Down", white, black, z, 0)
-            colorIf(cubies[i], "Front", blue, black, y, 2)
-            colorIf(cubies[i], "Back", green, black, y, 0)
-            colorIf(cubies[i], "Left", orange, black, x, 2)
-            colorIf(cubies[i], "Right", red, black, x, 0)
-            i = i + 1
+cubieSetup()
 
 tempNode = cameraRig.attachNewNode("tempNode")
 referenceNode = builtins.render.attachNewNode("referenceNode")
@@ -331,6 +362,7 @@ collisionTraverser.traverse(collisionSliceHolder)
 
 # placeholder for sequence
 s = None
+turnCount = 0
 
 app.accept("q", sys.exit)
 app.accept("space", checkSolved)
@@ -371,6 +403,6 @@ gameInfo = DirectDialog(frameSize=(-.8, .8, -.8, .8),
 gameInfo.hide()
 
 button("s", (-1, 0, -.5), randomizeCube)
-button("?", (-1, 0, -.8), helpDialog)
+# button("?", (-1, 0, -.8), helpDialog)
 
 app.run()
