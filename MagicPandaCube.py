@@ -65,21 +65,6 @@ def randomizeCube():
     return rotateList
 
 
-def onSpace():
-    print("onSpace")
-    flashRows = Sequence(name="flashRows")
-    print(tempNode.getNumChildren())
-    if tempNode.getNumChildren() > 0:
-        tempNode.getChildren().wrtReparentTo(builtins.render)
-    tempNode.clearTransform()
-    getCollisionCollection("Front").wrtReparentTo(tempNode)
-    scaleBigger = LerpScaleInterval(tempNode, 0.2, 1.1)
-    scaleOriginal = LerpScaleInterval(tempNode, 0.2, 1)
-    flashRows.append(scaleBigger)
-    flashRows.append(scaleOriginal)
-    flashRows.start()
-
-
 # model functions
 def hexColor(hex):
     if len(hex) < 8:
@@ -136,21 +121,28 @@ def getCollisionCollection(sliceType):
 
 
 def checkSolved():
-    n = 0
+    solved = True
     print("checkSolve")
-    for cubie in cubies:
-        name = cubie.name
-        originalPos = (int(name[5]) - 1,
-                       int(name[6]) - 1,
-                       int(name[7]) - 1)
-        pos = cubie.getPos(referenceNode)
-        currentPos = (round(pos[0]), round(pos[1]), round(pos[2]))
-        # print(cubie.name)
-        # print(str(originalPos) + "==" + str(currentPos))
-        if currentPos == originalPos:
-            n = n + 1
-    print(n)
-    if n == 27:
+    for i in range(3):
+        matchCount = [0, 0, 0]
+        matchPos = None
+        for cubie in cubies:
+            name = cubie.name
+            originalPos = (int(name[5]) - 1,
+                           int(name[6]) - 1,
+                           int(name[7]) - 1)
+            pos = cubie.getPos(builtins.render)
+            currentPos = (round(pos[0]), round(pos[1]), round(pos[2]))
+            if currentPos[i] == 1:
+                if matchPos is None:
+                    matchPos = originalPos
+                for j in range(3):
+                    if matchPos[j] == originalPos[j]:
+                        matchCount[j] = matchCount[j] + 1
+        print(matchCount)
+        if 9 not in matchCount:
+            solved = False
+    if solved:
         print("Solved!")
 
 
@@ -182,8 +174,8 @@ def rotateCube(hAngle, pAngle, rAngle):
         tempNode.getChildren().wrtReparentTo(builtins.render)
     tempNode.clearTransform()
     for cubie in cubies:
-        cubie.wrtReparentTo(referenceNode)
-    i = LerpHprInterval(referenceNode, 0.1, Vec3(hAngle, pAngle, rAngle))
+        cubie.wrtReparentTo(tempNode)
+    i = LerpHprInterval(tempNode, 0.1, Vec3(hAngle, pAngle, rAngle))
     return i
 
 
