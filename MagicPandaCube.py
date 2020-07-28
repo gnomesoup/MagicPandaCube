@@ -8,6 +8,7 @@ from panda3d.core import CollisionNode
 from panda3d.core import CollisionSphere
 from panda3d.core import CollisionPlane
 from panda3d.core import NodePathCollection
+from panda3d.core import TransparencyAttrib
 from direct.gui.DirectGui import OnscreenText
 from direct.gui.DirectGui import OnscreenImage
 from direct.gui.DirectGui import DirectDialog
@@ -22,14 +23,28 @@ import random
 
 
 # GUI functions
-def button(buttonText, buttonPos, buttonCommand):
-    DirectButton(text=(buttonText),
-                 text_scale=2,
-                 text_pos=(0, -.6),
-                 scale=0.07,
-                 pos=buttonPos,
-                 frameSize=(-2, 2, -2, 2),
-                 command=buttonCommand)
+def button(buttonText,
+           buttonPos,
+           buttonCommand,
+           buttonTextures,
+           buttonFrameSize):
+    button = DirectButton(text=("", "", buttonText, ""),
+                          text_scale=1.3,
+                          text_pos=(4.5, -.3),
+                          text_fg=(1, 1, 1, 1),
+                          text_shadow=(0, 0, 0, 0.5),
+                          frameTexture=buttonTextures,
+                          scale=0.05,
+                          pos=buttonPos,
+                          frameSize=(-buttonFrameSize,
+                                     buttonFrameSize,
+                                     -buttonFrameSize,
+                                     buttonFrameSize),
+                          relief=DGG.FLAT,
+                          parent=builtins.base.a2dBottomLeft,
+                          command=buttonCommand)
+    button.setTransparency(TransparencyAttrib.MAlpha)
+    return button
 
 
 def helpDialog():
@@ -51,7 +66,7 @@ def cubieSetup():
                 nodeName = "collision" + str(x) + str(y) + str(z)
                 cNode = CollisionNode(nodeName)
                 cNode.addSolid(CollisionSphere(0, 0, 0, 0.5))
-                cubieCollisions[i] = cubie.attachNewNode(cNode)
+                cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 cubie.setPos(pos)
                 cubie.setScale(0.95)
                 cubie.reparentTo(builtins.render)
@@ -65,6 +80,22 @@ def cubieSetup():
                 colorIf(cubie, "Right", red, black, x, 0)
                 cubies.addPath(cubie)
                 i = i + 1
+
+
+def cubieReset():
+    global turnCount
+    turnCount = 0
+    checkSolved()
+    cubies.reparentTo(builtins.render)
+    for cubie in cubies:
+        name = cubie.name
+        pos = Vec3(int(name[5]) - 1,
+                   int(name[6]) - 1,
+                   int(name[7]) - 1)
+        cubie.setPos(pos)
+        cubie.setHpr(0, 0, 0)
+    playButton.show()
+    rePlayButton.hide()
 
 
 def randomizeList(num):
@@ -83,17 +114,23 @@ def randomizeList(num):
 
 def randomizeCube():
     global s
-    global taskCount
-    taskCount = 0
+    cubieReset()
+    playButton.hide()
+    rePlayButton.show()
     print("Randomize")
     rotateList = randomizeList(20)
     i = 0
+    if s:
+        s.finish()
+    s = Sequence(name="randomize")
     for rotation in rotateList:
         args = rotateSliceArguments[rotation]
+        # s.append(rotateSlice(args[0], args[1], args[2], args[3]))
         builtins.taskMgr.doMethodLater(i * .3, rotateSliceTask,
                                        name="randomize" + str(i),
-                                       extraArgs=args)
+                                       extraArgs=args + [False])
         i = i + 1
+    # s.start()
     return rotateList
 
 
@@ -119,8 +156,6 @@ def colorIf(cObject, cDirection, cMaterial, eMaterial, cCoord, cIndex):
 
 
 # game action functions
-
-
 def getCollisionCollection(sliceType):
     ignoreSlice = None
     # create a collection of nodes that motch
@@ -154,24 +189,33 @@ def getCollisionCollection(sliceType):
 
 def checkSolved():
     global s
+    global turnCount
+    global gameStarted
     solved = True
     for i in range(3):
-        matchCount = [0, 0, 0]
+        matchPosCount = [0, 0, 0]
         matchPos = None
+        matchHpr = None
         for cubie in cubies:
             name = cubie.name
             originalPos = (int(name[5]) - 1,
                            int(name[6]) - 1,
                            int(name[7]) - 1)
             pos = cubie.getPos(builtins.render)
+            hpr = cubie.getHpr(builtins.render)
             currentPos = (round(pos[0]), round(pos[1]), round(pos[2]))
+            currentHpr = (round(hpr[0]), round(hpr[1]), round(hpr[2]))
             if currentPos[i] == 1:
                 if matchPos is None:
                     matchPos = originalPos
+                    matchHpr = currentHpr
                 for j in range(3):
-                    if matchPos[j] == originalPos[j]:
-                        matchCount[j] = matchCount[j] + 1
-        if 9 not in matchCount:
+                    if (
+                        matchPos[j] == originalPos[j]
+                        and matchHpr == currentHpr
+                    ):
+                        matchPosCount[j] = matchPosCount[j] + 1
+        if 9 not in matchPosCount:
             solved = False
     if solved:
         children = tempNode.getChildren()
@@ -184,7 +228,13 @@ def checkSolved():
                      LerpScaleInterval(tempNode, 0.2, 1),
                      name="congratulate")
         s.start()
+        turnCount = 0
         print("Solved!")
+        gameStarted = False
+        playButton.show()
+        rePlayButton.hide()
+    else:
+        countText.setText("Turns: " + str(turnCount))
     return solved
 
 
@@ -198,7 +248,7 @@ def rotateSlice(sliceType, hAngle, pAngle, rAngle):
     return i
 
 
-def rotateSliceTask(sliceType, hAngle, pAngle, rAngle):
+def rotateSliceTask(sliceType, hAngle, pAngle, rAngle, addTurn=True):
     global s
     global turnCount
     if s:
@@ -207,7 +257,8 @@ def rotateSliceTask(sliceType, hAngle, pAngle, rAngle):
                  Func(checkSolved),
                  name="rotate" + sliceType)
     s.start()
-    turnCount = turnCount + 1
+    if addTurn:
+        turnCount = turnCount + 1
 
 
 def rotateCube(hAngle, pAngle, rAngle):
@@ -300,10 +351,22 @@ countText = OnscreenText(
     parent=builtins.base.a2dTopRight,
     fg=(1, 1, 1, 1),
     shadow=(0, 0, 0, 0.5),
-    pos=(-0.1, 0.1),
-    scale=0.5
+    pos=(-0.2, -0.1),
+    scale=0.05
 )
 
+playButtonImages = (
+    builtins.loader.loadTexture("./baseline_play_circle_outline_white_48dp.png"),
+    builtins.loader.loadTexture("./baseline_play_circle_outline_black_48dp.png"),
+    builtins.loader.loadTexture("./baseline_play_circle_outline_white_48dp.png"),
+    builtins.loader.loadTexture("./baseline_play_circle_outline_white_48dp.png")
+)
+replayButtonImages = (
+    builtins.loader.loadTexture("./baseline_replay_white_48dp.png"),
+    builtins.loader.loadTexture("./baseline_replay_black_48dp.png"),
+    builtins.loader.loadTexture("./baseline_replay_white_48dp.png"),
+    builtins.loader.loadTexture("./baseline_replay_white_48dp.png")
+)
 # Load an image object
 imagePath = "galaxy.jpg"
 background = OnscreenImage(parent=builtins.render2dp, image=imagePath)
@@ -351,9 +414,21 @@ for i in range(len(sliceTypes)):
     collisionSlices[i].setTag("sliceType", sliceType)
     # cNode.setFromCollideMask(GeomNode.getDefaultCollideMask())
 
-# cubies = [None for i in range(27)]
+gameInfo = DirectDialog(frameSize=(-.8, .8, -.8, .8),
+                        fadeScreen=.4,
+                        relief=DGG.FLAT)
+gameInfo.hide()
+
+playButton = button("Shuffle", (.2, .1, .15), randomizeCube,
+                    playButtonImages, 2)
+rePlayButton = button("   Reset Cube", (.2, .1, .15), cubieReset,
+                      replayButtonImages, 1.75)
+rePlayButton.hide()
+
 cubies = NodePathCollection()
-cubieCollisions = [None for i in range(27)]
+cubies.reserve(27)
+cubieCollisions = NodePathCollection()
+cubieCollisions.reserve(27)
 cubieSetup()
 
 tempNode = cameraRig.attachNewNode("tempNode")
@@ -363,6 +438,7 @@ collisionTraverser.traverse(collisionSliceHolder)
 # placeholder for sequence
 s = None
 turnCount = 0
+gameStarted = False
 
 app.accept("q", sys.exit)
 app.accept("space", checkSolved)
@@ -396,13 +472,5 @@ app.accept("e", rotateSliceTask, rotateSliceArguments["E"])
 app.accept("shift-e", rotateSliceTask, rotateSliceArguments["E'"])
 app.accept("3", randomizeCube)
 app.accept("?", helpDialog)
-
-gameInfo = DirectDialog(frameSize=(-.8, .8, -.8, .8),
-                        fadeScreen=.4,
-                        relief=DGG.FLAT)
-gameInfo.hide()
-
-button("s", (-1, 0, -.5), randomizeCube)
-# button("?", (-1, 0, -.8), helpDialog)
 
 app.run()
