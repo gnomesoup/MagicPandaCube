@@ -116,7 +116,6 @@ def randomizeList(num):
             continue
         i = i + 1
         outList.append(key)
-    print(outList)
     return outList
 
 
@@ -138,8 +137,10 @@ def randomizeCube():
                                        name="randomize" + str(i),
                                        extraArgs=args + [False])
         i = i + 1
-    # s.start()
-    return rotateList
+    randomizeReport = " ".join(rotateList)
+    print(randomizeReport)
+    app.title.setText(randomizeReport)
+    return randomizeReport
 
 
 # model functions
@@ -247,6 +248,7 @@ def checkSolved():
                      LerpScaleInterval(tempNode, 0.2, 1),
                      name="congratulate")
         s.start()
+        app.title.setText("Solved in " + str(turnCount) + " turns")
         turnCount = 0
         print("Solved!")
         gameStarted = False
@@ -277,6 +279,8 @@ def rotateSliceTask(sliceType, hAngle, pAngle, rAngle, addTurn=True):
                  name="rotate" + sliceType)
     s.start()
     if addTurn:
+        if turnCount == 0:
+            app.title.setText("")
         turnCount = turnCount + 1
 
 
@@ -358,19 +362,19 @@ rotateSliceArguments = {
 app = ShowBase()
 app.title = OnscreenText(
     text="Rubik's Cube Simulator",
-    parent=builtins.base.a2dBottomCenter,
+    parent=builtins.base.a2dTopCenter,
     fg=(1, 1, 1, 1),
     shadow=(0, 0, 0, 0.5),
-    pos=(0, 0.1),
+    pos=(0, -0.15),
     scale=0.1,
 )
 
 countText = OnscreenText(
     text="Turns: 0",
-    parent=builtins.base.a2dTopRight,
+    parent=builtins.base.a2dBottomRight,
     fg=(1, 1, 1, 1),
     shadow=(0, 0, 0, 0.5),
-    pos=(-0.2, -0.1),
+    pos=(-0.2, 0.1),
     scale=0.05
 )
 
