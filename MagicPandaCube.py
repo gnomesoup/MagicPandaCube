@@ -72,12 +72,20 @@ def cubieSetup():
                 cubie.reparentTo(builtins.render)
                 collisionTraverser.addCollider(cubieCollisions[i],
                                                collisionHandler)
-                colorIf(cubie, "Up", yellow, black, z, 2)
-                colorIf(cubie, "Down", white, black, z, 0)
-                colorIf(cubie, "Front", blue, black, y, 2)
-                colorIf(cubie, "Back", green, black, y, 0)
-                colorIf(cubie, "Left", orange, black, x, 2)
-                colorIf(cubie, "Right", red, black, x, 0)
+                sideCount = 0
+                if colorIf(cubie, "Up", yellow, black, z, 2):
+                    sideCount = sideCount + 1
+                if colorIf(cubie, "Down", white, black, z, 0):
+                    sideCount = sideCount + 1
+                if colorIf(cubie, "Front", blue, black, y, 2):
+                    sideCount = sideCount + 1
+                if colorIf(cubie, "Back", green, black, y, 0):
+                    sideCount = sideCount + 1
+                if colorIf(cubie, "Left", orange, black, x, 2):
+                    sideCount = sideCount + 1
+                if colorIf(cubie, "Right", red, black, x, 0):
+                    sideCount = sideCount + 1
+                cubie.setPythonTag("sideCount", sideCount)
                 cubies.addPath(cubie)
                 i = i + 1
 
@@ -151,8 +159,10 @@ def colorIf(cObject, cDirection, cMaterial, eMaterial, cCoord, cIndex):
     oldMat = cObject.findMaterial(cDirection)
     if cCoord == cIndex:
         cObject.replaceMaterial(oldMat, cMaterial)
+        return True
     else:
         cObject.replaceMaterial(oldMat, eMaterial)
+        return False
 
 
 # game action functions
@@ -192,6 +202,7 @@ def checkSolved():
     global turnCount
     global gameStarted
     solved = True
+    # print("checkSolved")
     for i in range(3):
         matchPosCount = [0, 0, 0]
         matchPos = None
@@ -204,17 +215,25 @@ def checkSolved():
             pos = cubie.getPos(builtins.render)
             hpr = cubie.getHpr(builtins.render)
             currentPos = (round(pos[0]), round(pos[1]), round(pos[2]))
-            currentHpr = (round(hpr[0]), round(hpr[1]), round(hpr[2]))
+            currentHpr = Vec3(abs(round(hpr[0])),
+                              abs(round(hpr[1])),
+                              abs(round(hpr[2]))).normalized()
             if currentPos[i] == 1:
                 if matchPos is None:
                     matchPos = originalPos
                     matchHpr = currentHpr
+                # print(name)
+                # print(str(matchPos) + " == " + str(originalPos))
+                # print(str(matchHpr) + " == " + str(currentHpr))
+                # print(cubie.getPythonTag("sideCount"))
                 for j in range(3):
                     if (
                         matchPos[j] == originalPos[j]
-                        and matchHpr == currentHpr
+                        and (matchHpr == currentHpr
+                             or cubie.getPythonTag("sideCount") == 1)
                     ):
                         matchPosCount[j] = matchPosCount[j] + 1
+        # print(matchPosCount)
         if 9 not in matchPosCount:
             solved = False
     if solved:
@@ -308,8 +327,8 @@ rotateSliceArguments = {
     "U": ["Up", -90, 0, 0],
     "U'": ["Up", 90, 0, 0],
     "U2": ["Up", -180, 0, 0],
-    "D": ["Down", -90, 0, 0],
-    "D'": ["Down", 90, 0, 0],
+    "D": ["Down", 90, 0, 0],
+    "D'": ["Down", -90, 0, 0],
     "D2": ["Down", -180, 0, 0],
     "F": ["Front", 0, 0, -90],
     "F'": ["Front", 0, 0, 90],
@@ -448,10 +467,10 @@ app.accept("arrow_up", rotateCubeTask, [0, 90, 0])
 app.accept("arrow_down", rotateCubeTask, [0, -90, 0])
 app.accept("x", rotateCubeTask, [0, 90, 0])
 app.accept("shift-x", rotateCubeTask, [0, -90, 0])
-app.accept("y", rotateCubeTask, [0, 0, -90])
-app.accept("shift-y", rotateCubeTask, [0, 0, 90])
-app.accept("z", rotateCubeTask, [-90, 0, 0])
-app.accept("shift-z", rotateCubeTask, [90, 0, 0])
+app.accept("y", rotateCubeTask, [-90, 0, 0])
+app.accept("shift-y", rotateCubeTask, [90, 0, 0])
+app.accept("z", rotateCubeTask, [0, 0, -90])
+app.accept("shift-z", rotateCubeTask, [0, 0, 90])
 app.accept("r", rotateSliceTask, rotateSliceArguments["R"])
 app.accept("shift-r", rotateSliceTask, rotateSliceArguments["R'"])
 app.accept("l", rotateSliceTask, rotateSliceArguments["L"])
