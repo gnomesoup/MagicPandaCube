@@ -329,7 +329,7 @@ rotateSliceArguments = {
     "U2": ["Up", -180, 0, 0],
     "D": ["Down", 90, 0, 0],
     "D'": ["Down", -90, 0, 0],
-    "D2": ["Down", -180, 0, 0],
+    "D2": ["Down", 180, 0, 0],
     "F": ["Front", 0, 0, -90],
     "F'": ["Front", 0, 0, 90],
     "F2": ["Front", 0, 0, -180],
@@ -342,14 +342,14 @@ rotateSliceArguments = {
     "R": ["Right", 0, 90, 0],
     "R'": ["Right", 0, -90, 0],
     "R2": ["Right", 0, 180, 0],
-    "E": ["Equator", -90, 0, 0],
-    "E'": ["Equator", 90, 0, 0],
-    "E2": ["Equator", -180, 0, 0],
+    "E": ["Equator", 90, 0, 0],
+    "E'": ["Equator", -90, 0, 0],
+    "E2": ["Equator", 180, 0, 0],
     "S": ["Standing", 0, 0, -90],
     "S'": ["Standing", 0, 0, 90],
     "S2": ["Standing", 0, 0, -180],
-    "M": ["Middle", 0, 90, 0],
-    "M'": ["Middle", 0, -90, 0],
+    "M": ["Middle", 0, -90, 0],
+    "M'": ["Middle", 0, 90, 0],
     "M2": ["Middle", 0, -180, 0]
 }
 
