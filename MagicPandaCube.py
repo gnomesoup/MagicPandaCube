@@ -1,5 +1,6 @@
 import builtins
 from panda3d.core import AmbientLight
+from panda3d.core import BitMask32
 from panda3d.core import Vec3, Vec4, Plane, Point3
 from panda3d.core import Material
 from panda3d.core import CollisionTraverser
@@ -7,9 +8,9 @@ from panda3d.core import CollisionHandlerQueue
 from panda3d.core import CollisionNode
 from panda3d.core import CollisionSphere
 from panda3d.core import CollisionPlane
+from panda3d.core import CollisionRay
 from panda3d.core import NodePathCollection
 from panda3d.core import TransparencyAttrib
-from panda3d.core import TrueClock
 from direct.gui.DirectGui import OnscreenText
 from direct.gui.DirectGui import OnscreenImage
 from direct.gui.DirectGui import DirectDialog
@@ -21,7 +22,7 @@ from direct.interval.IntervalGlobal import Sequence, Func
 from direct.showbase.ShowBase import ShowBase
 import sys
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 # GUI functions
@@ -358,6 +359,28 @@ def acceptInput(app):
     app.accept("shift-e", rotateSliceTask, rotateSliceArguments["E'"])
     app.accept("3", randomizeCube)
     app.accept("?", helpDialog)
+    app.accept("mouse1", grabCubie)
+    app.accept("mouse1-up", releaseCubie)
+
+# Mouse functions
+
+
+def mouseTask(task):
+    global mousePos
+    if app.mouseWatcherNode.hasMouse():
+        mousePos = app.mouseWatcherNode.getMouse()
+        mouseRay.setFromLens(app.camNode,
+                             mousePos.getX(),
+                             mousePos.getY())
+    return task.cont
+
+
+def grabCubie():
+    pass
+
+
+def releaseCubie():
+    pass
 
 
 # Camera constants
@@ -464,9 +487,16 @@ ambientLight.setColor((1, 1, 1, 1))
 builtins.render.setLight(builtins.render.attachNewNode(ambientLight))
 
 collisionTraverser = CollisionTraverser()
-# builtins.base.cTrav = collisionTraverser
 collisionHandler = CollisionHandlerQueue()
 
+# Add mouse picking
+pickerNode = CollisionNode("pickerNode")
+pickerNodePath = builtins.camera.attachNewNode(pickerNode)
+pickerNode.setFromCollideMask(BitMask32.bit(2))
+mouseRay = CollisionRay()
+pickerNode.addSolid(mouseRay)
+collisionTraverser.addCollider(pickerNodePath, collisionHandler)
+pickerNodePath.show()
 
 sliceTypes = {
     "Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
@@ -486,6 +516,7 @@ collisionSlices = [None for i in range(len(sliceTypes))]
 for i in range(len(sliceTypes)):
     sliceType = list(sliceTypes.keys())[i]
     cNode = CollisionNode(sliceType)
+    cNode.setFromCollideMask(BitMask32.bit(1))
     collisionSlices[i] = collisionSliceHolder.attachNewNode(cNode)
     cNode.addSolid(CollisionPlane(sliceTypes[sliceType]))
     collisionSlices[i].setTag("sliceType", sliceType)
@@ -517,5 +548,6 @@ s = None
 turnCount = 0
 gameStarted = False
 gameTime = None
+builtins.taskMgr.add(mouseTask, "mouseTask")
 acceptInput(app)
 app.run()
