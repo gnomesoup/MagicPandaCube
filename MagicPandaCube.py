@@ -9,6 +9,7 @@ from panda3d.core import CollisionSphere
 from panda3d.core import CollisionPlane
 from panda3d.core import NodePathCollection
 from panda3d.core import TransparencyAttrib
+from panda3d.core import TrueClock
 from direct.gui.DirectGui import OnscreenText
 from direct.gui.DirectGui import OnscreenImage
 from direct.gui.DirectGui import DirectDialog
@@ -20,6 +21,7 @@ from direct.interval.IntervalGlobal import Sequence, Func
 from direct.showbase.ShowBase import ShowBase
 import sys
 import random
+from datetime import datetime, timedelta
 
 
 # GUI functions
@@ -121,6 +123,8 @@ def randomizeList(num):
 
 def randomizeCube():
     global s
+    global gameStarted
+    app.ignoreAll()
     cubieReset()
     playButton.hide()
     rePlayButton.show()
@@ -137,8 +141,12 @@ def randomizeCube():
                                        name="randomize" + str(i),
                                        extraArgs=args + [False])
         i = i + 1
+    builtins.taskMgr.doMethodLater(i * .3, acceptInput,
+                                   name="acceptInput",
+                                   extraArgs=[app])
     randomizeReport = " ".join(rotateList)
     print(randomizeReport)
+    gameStarted = True
     app.title.setText(randomizeReport)
     return randomizeReport
 
@@ -237,7 +245,7 @@ def checkSolved():
         # print(matchPosCount)
         if 9 not in matchPosCount:
             solved = False
-    if solved:
+    if solved and gameStarted:
         children = tempNode.getChildren()
         children.wrtReparentTo(builtins.render)
         tempNode.clearTransform()
@@ -248,14 +256,23 @@ def checkSolved():
                      LerpScaleInterval(tempNode, 0.2, 1),
                      name="congratulate")
         s.start()
-        app.title.setText("Solved in " + str(turnCount) + " turns")
+        if gameTime:
+            gameFinishTime = (datetime.now() - gameTime).seconds
+            gameTimeReport = ""
+            if gameFinishTime > 60:
+                gameTimeReport = str(gameFinishTime//60) + "m "
+            gameTimeReport = gameTimeReport + str(gameFinishTime % 60) + "s"
+        app.title.setText("Solved in "
+                          + str(gameTimeReport)
+                          + " with "
+                          + str(turnCount)
+                          + " turns")
         turnCount = 0
         print("Solved!")
         gameStarted = False
         playButton.show()
         rePlayButton.hide()
-    else:
-        countText.setText("Turns: " + str(turnCount))
+    countText.setText("Turns: " + str(turnCount))
     return solved
 
 
@@ -272,6 +289,7 @@ def rotateSlice(sliceType, hAngle, pAngle, rAngle):
 def rotateSliceTask(sliceType, hAngle, pAngle, rAngle, addTurn=True):
     global s
     global turnCount
+    global gameTime
     if s:
         s.finish()
     s = Sequence(rotateSlice(sliceType, hAngle, pAngle, rAngle),
@@ -281,6 +299,7 @@ def rotateSliceTask(sliceType, hAngle, pAngle, rAngle, addTurn=True):
     if addTurn:
         if turnCount == 0:
             app.title.setText("")
+            gameTime = datetime.now()
         turnCount = turnCount + 1
 
 
@@ -304,6 +323,41 @@ def rotateCubeTask(hAngle, pAngle, rAngle):
     i = rotateCube(hAngle, pAngle, rAngle)
     s = Sequence(i, name="roateCube")
     s.start()
+
+
+def acceptInput(app):
+    app.accept("q", sys.exit)
+    app.accept("space", checkSolved)
+    app.accept("arrow_left", rotateCubeTask, [-90, 0, 0])
+    app.accept("arrow_right", rotateCubeTask, [90, 0, 0])
+    app.accept("arrow_up", rotateCubeTask, [0, 90, 0])
+    app.accept("arrow_down", rotateCubeTask, [0, -90, 0])
+    app.accept("x", rotateCubeTask, [0, 90, 0])
+    app.accept("shift-x", rotateCubeTask, [0, -90, 0])
+    app.accept("y", rotateCubeTask, [-90, 0, 0])
+    app.accept("shift-y", rotateCubeTask, [90, 0, 0])
+    app.accept("z", rotateCubeTask, [0, 0, -90])
+    app.accept("shift-z", rotateCubeTask, [0, 0, 90])
+    app.accept("r", rotateSliceTask, rotateSliceArguments["R"])
+    app.accept("shift-r", rotateSliceTask, rotateSliceArguments["R'"])
+    app.accept("l", rotateSliceTask, rotateSliceArguments["L"])
+    app.accept("shift-l", rotateSliceTask, rotateSliceArguments["L'"])
+    app.accept("m", rotateSliceTask, rotateSliceArguments["M"])
+    app.accept("shift-m", rotateSliceTask, rotateSliceArguments["M'"])
+    app.accept("f", rotateSliceTask, rotateSliceArguments["F"])
+    app.accept("shift-f", rotateSliceTask, rotateSliceArguments["F'"])
+    app.accept("b", rotateSliceTask, rotateSliceArguments["B"])
+    app.accept("shift-b", rotateSliceTask, rotateSliceArguments["B'"])
+    app.accept("s", rotateSliceTask, rotateSliceArguments["S"])
+    app.accept("shift-s", rotateSliceTask, rotateSliceArguments["S'"])
+    app.accept("u", rotateSliceTask, rotateSliceArguments["U"])
+    app.accept("shift-u", rotateSliceTask, rotateSliceArguments["U'"])
+    app.accept("d", rotateSliceTask, rotateSliceArguments["D"])
+    app.accept("shift-d", rotateSliceTask, rotateSliceArguments["D'"])
+    app.accept("e", rotateSliceTask, rotateSliceArguments["E"])
+    app.accept("shift-e", rotateSliceTask, rotateSliceArguments["E'"])
+    app.accept("3", randomizeCube)
+    app.accept("?", helpDialog)
 
 
 # Camera constants
@@ -462,38 +516,6 @@ collisionTraverser.traverse(collisionSliceHolder)
 s = None
 turnCount = 0
 gameStarted = False
-
-app.accept("q", sys.exit)
-app.accept("space", checkSolved)
-app.accept("arrow_left", rotateCubeTask, [-90, 0, 0])
-app.accept("arrow_right", rotateCubeTask, [90, 0, 0])
-app.accept("arrow_up", rotateCubeTask, [0, 90, 0])
-app.accept("arrow_down", rotateCubeTask, [0, -90, 0])
-app.accept("x", rotateCubeTask, [0, 90, 0])
-app.accept("shift-x", rotateCubeTask, [0, -90, 0])
-app.accept("y", rotateCubeTask, [-90, 0, 0])
-app.accept("shift-y", rotateCubeTask, [90, 0, 0])
-app.accept("z", rotateCubeTask, [0, 0, -90])
-app.accept("shift-z", rotateCubeTask, [0, 0, 90])
-app.accept("r", rotateSliceTask, rotateSliceArguments["R"])
-app.accept("shift-r", rotateSliceTask, rotateSliceArguments["R'"])
-app.accept("l", rotateSliceTask, rotateSliceArguments["L"])
-app.accept("shift-l", rotateSliceTask, rotateSliceArguments["L'"])
-app.accept("m", rotateSliceTask, rotateSliceArguments["M"])
-app.accept("shift-m", rotateSliceTask, rotateSliceArguments["M'"])
-app.accept("f", rotateSliceTask, rotateSliceArguments["F"])
-app.accept("shift-f", rotateSliceTask, rotateSliceArguments["F'"])
-app.accept("b", rotateSliceTask, rotateSliceArguments["B"])
-app.accept("shift-b", rotateSliceTask, rotateSliceArguments["B'"])
-app.accept("s", rotateSliceTask, rotateSliceArguments["S"])
-app.accept("shift-s", rotateSliceTask, rotateSliceArguments["S'"])
-app.accept("u", rotateSliceTask, rotateSliceArguments["U"])
-app.accept("shift-u", rotateSliceTask, rotateSliceArguments["U'"])
-app.accept("d", rotateSliceTask, rotateSliceArguments["D"])
-app.accept("shift-d", rotateSliceTask, rotateSliceArguments["D'"])
-app.accept("e", rotateSliceTask, rotateSliceArguments["E"])
-app.accept("shift-e", rotateSliceTask, rotateSliceArguments["E'"])
-app.accept("3", randomizeCube)
-app.accept("?", helpDialog)
-
+gameTime = None
+acceptInput(app)
 app.run()
