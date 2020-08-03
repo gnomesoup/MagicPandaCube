@@ -69,6 +69,7 @@ def cubieSetup():
                 nodeName = "collision" + str(x) + str(y) + str(z)
                 cNode = CollisionNode(nodeName)
                 cNode.addSolid(CollisionSphere(0, 0, 0, 0.5))
+                cNode.setIntoCollideMask(BitMask32.bit(1))
                 cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 cubie.setPos(pos)
                 cubie.setScale(0.95)
@@ -128,7 +129,6 @@ def randomizeCube():
     app.ignoreAll()
     cubieReset()
     playButton.hide()
-    rePlayButton.show()
     print("Randomize")
     rotateList = randomizeList(20)
     i = 0
@@ -188,12 +188,17 @@ def getCollisionCollection(sliceType):
     sliceIndex = sliceKeys.index(sliceType)
     if sliceIndex % 3 == 2:
         ignoreSlice = sliceKeys[sliceIndex - 1]
-    # go through the collisions an check for a match
+    # go through the collisions and check for a match
     for i in range(collisionCount):
         intoNode = collisionHandler.getEntry(i).getIntoNodePath()
         tag = intoNode.findNetTag("sliceType")
         if str(tag).endswith(sliceType):
+            # print("Tag: " + str(tag))
+            # print("sliceType: " + sliceType)
             fromNode = collisionHandler.getEntry(i).getFromNodePath()
+            # print("fromNode:")
+            # print(fromNode)
+            # print(" ")
             collisionCollection.addPath(fromNode.getParent())
     # remove extra nodes if the slice is an internal one
     if ignoreSlice:
@@ -203,7 +208,11 @@ def getCollisionCollection(sliceType):
             if str(tag).endswith(ignoreSlice):
                 fromNode = collisionHandler.getEntry(i).getFromNodePath()
                 collisionCollection.removePath(fromNode.getParent())
+    collisionCollection.removePath(builtins.camera)
     # return the matched collisions
+    # print("")
+    # print("Collected:")
+    # print(collisionCollection)
     return collisionCollection
 
 
@@ -257,17 +266,18 @@ def checkSolved():
                      LerpScaleInterval(tempNode, 0.2, 1),
                      name="congratulate")
         s.start()
+        gameTimeReport = ""
         if gameTime:
             gameFinishTime = (datetime.now() - gameTime).seconds
-            gameTimeReport = ""
             if gameFinishTime > 60:
                 gameTimeReport = str(gameFinishTime//60) + "m "
             gameTimeReport = gameTimeReport + str(gameFinishTime % 60) + "s"
-        app.title.setText("Solved in "
-                          + str(gameTimeReport)
-                          + " with "
-                          + str(turnCount)
-                          + " turns")
+            gameTimeReport = ("Solved in "
+                              + str(gameTimeReport)
+                              + " with "
+                              + str(turnCount)
+                              + " turns")
+        app.title.setText(gameTimeReport)
         turnCount = 0
         print("Solved!")
         gameStarted = False
@@ -283,6 +293,8 @@ def rotateSlice(sliceType, hAngle, pAngle, rAngle):
     tempNode.clearTransform()
     nodes = getCollisionCollection(sliceType)
     nodes.wrtReparentTo(tempNode)
+    # print("tempNode Children:")
+    # print(tempNode.getChildren())
     i = LerpHprInterval(tempNode, 0.2, Vec3(hAngle, pAngle, rAngle))
     return i
 
@@ -299,7 +311,7 @@ def rotateSliceTask(sliceType, hAngle, pAngle, rAngle, addTurn=True):
     s.start()
     if addTurn:
         if turnCount == 0:
-            app.title.setText("")
+            app.title.setText(" ")
             gameTime = datetime.now()
         turnCount = turnCount + 1
 
@@ -328,7 +340,7 @@ def rotateCubeTask(hAngle, pAngle, rAngle):
 
 def acceptInput(app):
     app.accept("q", sys.exit)
-    app.accept("space", checkSolved)
+    app.accept("space", onSpace)
     app.accept("arrow_left", rotateCubeTask, [-90, 0, 0])
     app.accept("arrow_right", rotateCubeTask, [90, 0, 0])
     app.accept("arrow_up", rotateCubeTask, [0, 90, 0])
@@ -359,12 +371,13 @@ def acceptInput(app):
     app.accept("shift-e", rotateSliceTask, rotateSliceArguments["E'"])
     app.accept("3", randomizeCube)
     app.accept("?", helpDialog)
-    app.accept("mouse1", grabCubie)
-    app.accept("mouse1-up", releaseCubie)
+    # app.accept("mouse1", grabCubie)
+    # app.accept("mouse1-up", releaseCubie)
+    if gameStarted:
+        rePlayButton.show()
+
 
 # Mouse functions
-
-
 def mouseTask(task):
     global mousePos
     if app.mouseWatcherNode.hasMouse():
@@ -372,16 +385,25 @@ def mouseTask(task):
         mouseRay.setFromLens(app.camNode,
                              mousePos.getX(),
                              mousePos.getY())
+        collisionTraverser.traverse(collisionSliceHolder)
+        if collisionHandler.getNumEntries() > 0:
+            collisionHandler.sortEntries()
+            intoNode = collisionHandler.getEntry(0).getIntoNode()
+            app.title.setText(intoNode.getParent(0).name)
     return task.cont
 
 
-def grabCubie():
-    pass
+# def grabCubie():
+#     pass
 
 
-def releaseCubie():
-    pass
+# def releaseCubie():
+#     pass
 
+
+def onSpace():
+    print("tempNode Children:")
+    print(tempNode.getChildren())
 
 # Camera constants
 CAMERADIST = 8
@@ -518,8 +540,11 @@ for i in range(len(sliceTypes)):
     cNode = CollisionNode(sliceType)
     cNode.setFromCollideMask(BitMask32.bit(1))
     collisionSlices[i] = collisionSliceHolder.attachNewNode(cNode)
+    collisionSlices[i].node().setFromCollideMask(BitMask32.bit(1))
     cNode.addSolid(CollisionPlane(sliceTypes[sliceType]))
     collisionSlices[i].setTag("sliceType", sliceType)
+    # if sliceType in ("Right", "Left", "Middle"):
+    #     collisionSlices[i].show()
     # cNode.setFromCollideMask(GeomNode.getDefaultCollideMask())
 
 gameInfo = DirectDialog(frameSize=(-.8, .8, -.8, .8),
