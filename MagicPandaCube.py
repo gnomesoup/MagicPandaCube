@@ -65,7 +65,6 @@ def cubieSetup():
                 pos = Vec3(x - 1, y - 1, z - 1)
                 nodeName = "cubie" + str(x) + str(y) + str(z)
                 cubie = builtins.loader.loadModel("cubie")
-                cubie.name = nodeName
                 nodeName = "collision" + str(x) + str(y) + str(z)
                 cNode = CollisionNode(nodeName)
                 cNode.addSolid(CollisionSphere(0, 0, 0, 0.5))
@@ -77,19 +76,36 @@ def cubieSetup():
                 collisionTraverser.addCollider(cubieCollisions[i],
                                                collisionHandler)
                 sideCount = 0
+                name = ""
                 if colorIf(cubie, "Up", yellow, black, z, 2):
                     sideCount = sideCount + 1
+                    name += "Y"
                 if colorIf(cubie, "Down", white, black, z, 0):
                     sideCount = sideCount + 1
+                    name += "W"
                 if colorIf(cubie, "Front", blue, black, y, 2):
                     sideCount = sideCount + 1
+                    name += "B"
                 if colorIf(cubie, "Back", green, black, y, 0):
                     sideCount = sideCount + 1
+                    name += "G"
                 if colorIf(cubie, "Left", orange, black, x, 2):
                     sideCount = sideCount + 1
+                    name += "O"
                 if colorIf(cubie, "Right", red, black, x, 0):
                     sideCount = sideCount + 1
+                    name += "R"
+                if len(name) == 3:
+                    name = "corner" + name
+                elif len(name) == 2:
+                    name = "edge" + name
+                elif len(name) == 1:
+                    name = "center" + name
+                else:
+                    name = "internal"
                 cubie.setPythonTag("sideCount", sideCount)
+                cubie.setPythonTag("originalPos", pos)
+                cubie.name = name
                 cubies.addPath(cubie)
                 i = i + 1
 
@@ -100,10 +116,11 @@ def cubieReset():
     checkSolved()
     cubies.reparentTo(builtins.render)
     for cubie in cubies:
-        name = cubie.name
-        pos = Vec3(int(name[5]) - 1,
-                   int(name[6]) - 1,
-                   int(name[7]) - 1)
+        # name = cubie.name
+        # pos = Vec3(int(name[5]) - 1,
+        #            int(name[6]) - 1,
+        #            int(name[7]) - 1)
+        pos = cubie.getPythonTag("originalPos")
         cubie.setPos(pos)
         cubie.setHpr(0, 0, 0)
     playButton.show()
@@ -176,44 +193,18 @@ def colorIf(cObject, cDirection, cMaterial, eMaterial, cCoord, cIndex):
 
 
 # game action functions
-def getCollisionCollection(sliceType):
-    ignoreSlice = None
-    # create a collection of nodes that motch
-    collisionCollection = NodePathCollection()
-    # run the check for collisions
-    collisionTraverser.traverse(collisionSliceHolder)
-    collisionCount = collisionHandler.getNumEntries()
-    # check if the slice is internal
-    sliceKeys = list(sliceTypes.keys())
-    sliceIndex = sliceKeys.index(sliceType)
-    if sliceIndex % 3 == 2:
-        ignoreSlice = sliceKeys[sliceIndex - 1]
-    # go through the collisions and check for a match
-    for i in range(collisionCount):
-        intoNode = collisionHandler.getEntry(i).getIntoNodePath()
-        tag = intoNode.findNetTag("sliceType")
-        if str(tag).endswith(sliceType):
-            # print("Tag: " + str(tag))
-            # print("sliceType: " + sliceType)
-            fromNode = collisionHandler.getEntry(i).getFromNodePath()
-            # print("fromNode:")
-            # print(fromNode)
-            # print(" ")
-            collisionCollection.addPath(fromNode.getParent())
-    # remove extra nodes if the slice is an internal one
-    if ignoreSlice:
-        for i in range(collisionCount):
-            intoNode = collisionHandler.getEntry(i).getIntoNodePath()
-            tag = intoNode.findNetTag("sliceType")
-            if str(tag).endswith(ignoreSlice):
-                fromNode = collisionHandler.getEntry(i).getFromNodePath()
-                collisionCollection.removePath(fromNode.getParent())
-    collisionCollection.removePath(builtins.camera)
-    # return the matched collisions
-    # print("")
-    # print("Collected:")
-    # print(collisionCollection)
-    return collisionCollection
+def getCubiesInSlice(sliceType):
+    sliceCollection = NodePathCollection()
+    slicePoint = sliceTypes[sliceType]
+    for i in range(3):
+        if slicePoint[i] != 0:
+            sliceIndex = i
+            sliceIndexValue = slicePoint[i]
+    for cubie in cubies:
+        pos = cubie.getPos(builtins.render)
+        if round(pos[sliceIndex]) == sliceIndexValue:
+            sliceCollection.addPath(cubie)
+    return sliceCollection
 
 
 def checkSolved():
@@ -227,10 +218,7 @@ def checkSolved():
         matchPos = None
         matchHpr = None
         for cubie in cubies:
-            name = cubie.name
-            originalPos = (int(name[5]) - 1,
-                           int(name[6]) - 1,
-                           int(name[7]) - 1)
+            originalPos = cubie.getPythonTag("originalPos")
             pos = cubie.getPos(builtins.render)
             hpr = cubie.getHpr(builtins.render)
             currentPos = (round(pos[0]), round(pos[1]), round(pos[2]))
@@ -291,7 +279,8 @@ def rotateSlice(sliceType, hAngle, pAngle, rAngle):
     children = tempNode.getChildren()
     children.wrtReparentTo(builtins.render)
     tempNode.clearTransform()
-    nodes = getCollisionCollection(sliceType)
+    # nodes = getCollisionCollection(sliceType)
+    nodes = getCubiesInSlice(sliceType)
     nodes.wrtReparentTo(tempNode)
     # print("tempNode Children:")
     # print(tempNode.getChildren())
@@ -385,11 +374,11 @@ def mouseTask(task):
         mouseRay.setFromLens(app.camNode,
                              mousePos.getX(),
                              mousePos.getY())
-        collisionTraverser.traverse(collisionSliceHolder)
-        if collisionHandler.getNumEntries() > 0:
-            collisionHandler.sortEntries()
-            intoNode = collisionHandler.getEntry(0).getIntoNode()
-            app.title.setText(intoNode.getParent(0).name)
+        # collisionTraverser.traverse(collisionSliceHolder)
+        # if collisionHandler.getNumEntries() > 0:
+        #     collisionHandler.sortEntries()
+        #     intoNode = collisionHandler.getEntry(0).getIntoNode()
+        #     app.title.setText(intoNode.getParent(0).name)
     return task.cont
 
 
@@ -402,8 +391,10 @@ def mouseTask(task):
 
 
 def onSpace():
-    print("tempNode Children:")
-    print(tempNode.getChildren())
+    # print("tempNode Children:")
+    # print(tempNode.getChildren())
+    for cubie in cubies:
+        print(cubie.name + ":" + str(cubie.getPos(builtins.render)))
 
 # Camera constants
 CAMERADIST = 8
@@ -520,29 +511,40 @@ pickerNode.addSolid(mouseRay)
 collisionTraverser.addCollider(pickerNodePath, collisionHandler)
 pickerNodePath.show()
 
+# sliceTypes = {
+#     "Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
+#     "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
+#     "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
+#     "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
+#     "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
+#     "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
+#     "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
+#     "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
+#     "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0)),
+# }
 sliceTypes = {
-    "Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
-    "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
-    "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
-    "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
-    "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
-    "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
-    "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
-    "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
-    "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0)),
+    "Up": Point3(0, 0, 1),
+    "Down": Point3(0, 0, -1),
+    "Equator": Point3(0, 0, 0),
+    "Front": Point3(0, 1, 0),
+    "Back": Point3(0, -1, 0),
+    "Standing": Point3(0, 0, 0),
+    "Left": Point3(1, 0, 0),
+    "Right": Point3(-1, 0, 0),
+    "Middle": Point3(0, 0, 0),
 }
 
 
-collisionSliceHolder = cameraRig.attachNewNode("collisionSlices")
-collisionSlices = [None for i in range(len(sliceTypes))]
-for i in range(len(sliceTypes)):
-    sliceType = list(sliceTypes.keys())[i]
-    cNode = CollisionNode(sliceType)
-    cNode.setFromCollideMask(BitMask32.bit(1))
-    collisionSlices[i] = collisionSliceHolder.attachNewNode(cNode)
-    collisionSlices[i].node().setFromCollideMask(BitMask32.bit(1))
-    cNode.addSolid(CollisionPlane(sliceTypes[sliceType]))
-    collisionSlices[i].setTag("sliceType", sliceType)
+# collisionSliceHolder = cameraRig.attachNewNode("collisionSlices")
+# collisionSlices = [None for i in range(len(sliceTypes))]
+# for i in range(len(sliceTypes)):
+#     sliceType = list(sliceTypes.keys())[i]
+#     cNode = CollisionNode(sliceType)
+#     cNode.setFromCollideMask(BitMask32.bit(1))
+#     collisionSlices[i] = collisionSliceHolder.attachNewNode(cNode)
+#     collisionSlices[i].node().setFromCollideMask(BitMask32.bit(1))
+#     cNode.addSolid(CollisionPlane(sliceTypes[sliceType]))
+#     collisionSlices[i].setTag("sliceType", sliceType)
     # if sliceType in ("Right", "Left", "Middle"):
     #     collisionSlices[i].show()
     # cNode.setFromCollideMask(GeomNode.getDefaultCollideMask())
@@ -566,7 +568,7 @@ cubieSetup()
 
 tempNode = cameraRig.attachNewNode("tempNode")
 referenceNode = builtins.render.attachNewNode("referenceNode")
-collisionTraverser.traverse(collisionSliceHolder)
+# collisionTraverser.traverse(collisionSliceHolder)
 
 # placeholder for sequence
 s = None
