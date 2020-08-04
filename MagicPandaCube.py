@@ -1,13 +1,13 @@
 import builtins
 from panda3d.core import AmbientLight
 from panda3d.core import BitMask32
-from panda3d.core import Vec3, Vec4, Plane, Point3
+from panda3d.core import Vec3, Vec4, Point3
+from panda3d.core import Plane
 from panda3d.core import Material
 from panda3d.core import CollisionTraverser
 from panda3d.core import CollisionHandlerQueue
 from panda3d.core import CollisionNode
-from panda3d.core import CollisionSphere
-from panda3d.core import CollisionPlane
+from panda3d.core import CollisionPolygon
 from panda3d.core import CollisionRay
 from panda3d.core import NodePathCollection
 from panda3d.core import TransparencyAttrib
@@ -195,14 +195,11 @@ def colorIf(cObject, cDirection, cMaterial, eMaterial, cCoord, cIndex):
 # game action functions
 def getCubiesInSlice(sliceType):
     sliceCollection = NodePathCollection()
-    slicePoint = sliceTypes[sliceType]
-    for i in range(3):
-        if slicePoint[i] != 0:
-            sliceIndex = i
-            sliceIndexValue = slicePoint[i]
+    slicePlane = sliceTypes[sliceType]
     for cubie in cubies:
         pos = cubie.getPos(builtins.render)
-        if round(pos[sliceIndex]) == sliceIndexValue:
+        d = slicePlane.distToPlane(pos)
+        if d < 0.1 and d > -0.1:
             sliceCollection.addPath(cubie)
     return sliceCollection
 
@@ -505,49 +502,22 @@ collisionHandler = CollisionHandlerQueue()
 # Add mouse picking
 pickerNode = CollisionNode("pickerNode")
 pickerNodePath = builtins.camera.attachNewNode(pickerNode)
-pickerNode.setFromCollideMask(BitMask32.bit(2))
+pickerNode.setFromCollideMask(BitMask32.bit(1))
 mouseRay = CollisionRay()
 pickerNode.addSolid(mouseRay)
 collisionTraverser.addCollider(pickerNodePath, collisionHandler)
-pickerNodePath.show()
 
-# sliceTypes = {
-#     "Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
-#     "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
-#     "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
-#     "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
-#     "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
-#     "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
-#     "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
-#     "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
-#     "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0)),
-# }
 sliceTypes = {
-    "Up": Point3(0, 0, 1),
-    "Down": Point3(0, 0, -1),
-    "Equator": Point3(0, 0, 0),
-    "Front": Point3(0, 1, 0),
-    "Back": Point3(0, -1, 0),
-    "Standing": Point3(0, 0, 0),
-    "Left": Point3(1, 0, 0),
-    "Right": Point3(-1, 0, 0),
-    "Middle": Point3(0, 0, 0),
+    "Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
+    "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
+    "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
+    "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
+    "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
+    "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
+    "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
+    "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
+    "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0)),
 }
-
-
-# collisionSliceHolder = cameraRig.attachNewNode("collisionSlices")
-# collisionSlices = [None for i in range(len(sliceTypes))]
-# for i in range(len(sliceTypes)):
-#     sliceType = list(sliceTypes.keys())[i]
-#     cNode = CollisionNode(sliceType)
-#     cNode.setFromCollideMask(BitMask32.bit(1))
-#     collisionSlices[i] = collisionSliceHolder.attachNewNode(cNode)
-#     collisionSlices[i].node().setFromCollideMask(BitMask32.bit(1))
-#     cNode.addSolid(CollisionPlane(sliceTypes[sliceType]))
-#     collisionSlices[i].setTag("sliceType", sliceType)
-    # if sliceType in ("Right", "Left", "Middle"):
-    #     collisionSlices[i].show()
-    # cNode.setFromCollideMask(GeomNode.getDefaultCollideMask())
 
 gameInfo = DirectDialog(frameSize=(-.8, .8, -.8, .8),
                         fadeScreen=.4,
