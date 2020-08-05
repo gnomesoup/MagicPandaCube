@@ -67,8 +67,6 @@ def cubieSetup():
                 cubieModel = builtins.loader.loadModel("cubie")
                 cubieModel.setScale(0.95)
                 cubieModel.reparentTo(cubie)
-                nodeName = "collision" + str(x) + str(y) + str(z)
-                cNode = CollisionNode(nodeName)
                 # cNode.addSolid(CollisionSphere(0, 0, 0, 0.5))
                 cubie.setPos(pos)
                 # cubie.setScale(0.95)
@@ -80,6 +78,7 @@ def cubieSetup():
                 if colorIf(cubie, "Up", yellow, black, z, 2):
                     sideCount = sideCount + 1
                     name += "Y"
+                    cNode = CollisionNode("Yellow")
                     quad = CollisionPolygon(Point3(-.5, -.5, .5),
                                             Point3(.5, -.5, .5),
                                             Point3(.5, .5, .5),
@@ -89,43 +88,55 @@ def cubieSetup():
                 if colorIf(cubie, "Down", white, black, z, 0):
                     sideCount = sideCount + 1
                     name += "W"
-                    quad = CollisionPolygon(Point3(-.5, -.5, -.5),
-                                            Point3(.5, -.5, -.5),
-                                            Point3(.5, .5, -.5),
-                                            Point3(-.5, .5, -.5))
+                    cNode = CollisionNode("White")
+                    quad = CollisionPolygon(
+                        Point3(-.5, -.5, -.5),
+                        Point3(-.5, .5, -.5),
+                        Point3(.5, .5, -.5),
+                        Point3(.5, -.5, -.5)
+                        )
                     cNode.addSolid(quad)
+                    cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 if colorIf(cubie, "Front", blue, black, y, 2):
                     sideCount = sideCount + 1
                     name += "B"
+                    cNode = CollisionNode("Blue")
                     quad = CollisionPolygon(Point3(-.5, .5, -.5),
                                             Point3(-.5, .5, .5),
                                             Point3(.5, .5, .5),
                                             Point3(.5, .5, -.5))
                     cNode.addSolid(quad)
+                    cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 if colorIf(cubie, "Back", green, black, y, 0):
                     sideCount = sideCount + 1
                     name += "G"
+                    cNode = CollisionNode("Green")
                     quad = CollisionPolygon(Point3(-.5, -.5, -.5),
-                                            Point3(-.5, -.5, .5),
+                                            Point3(.5, -.5, -.5),
                                             Point3(.5, -.5, .5),
-                                            Point3(.5, -.5, -.5))
+                                            Point3(-.5, -.5, .5))
                     cNode.addSolid(quad)
+                    cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 if colorIf(cubie, "Left", orange, black, x, 2):
                     sideCount = sideCount + 1
                     name += "O"
+                    cNode = CollisionNode("Orange")
                     quad = CollisionPolygon(Point3(.5, -.5, -.5),
-                                            Point3(.5, -.5, .5),
+                                            Point3(.5, .5, -.5),
                                             Point3(.5, .5, .5),
-                                            Point3(.5, .5, -.5))
+                                            Point3(.5, -.5, .5))
                     cNode.addSolid(quad)
+                    cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 if colorIf(cubie, "Right", red, black, x, 0):
                     sideCount = sideCount + 1
                     name += "R"
+                    cNode = CollisionNode("Red")
                     quad = CollisionPolygon(Point3(-.5, -.5, -.5),
                                             Point3(-.5, -.5, .5),
                                             Point3(-.5, .5, .5),
                                             Point3(-.5, .5, -.5))
                     cNode.addSolid(quad)
+                    cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 if len(name) == 3:
                     name = "corner" + name
                 elif len(name) == 2:
@@ -135,7 +146,6 @@ def cubieSetup():
                 else:
                     name = "internal"
                 cNode.setIntoCollideMask(BitMask32.bit(1))
-                cubieCollisions.addPath(cubie.attachNewNode(cNode))
                 cubie.setPythonTag("sideCount", sideCount)
                 cubie.setPythonTag("originalPos", pos)
                 cubie.name = name
@@ -403,17 +413,21 @@ def mouseTask(task):
     global onCubie
     global dragging
     global startClickPoint
+    global currentCollisionEntry
+    # First check if we have the mouse in the window
     if app.mouseWatcherNode.hasMouse():
+        # Get the position of the mouse and make the collision ray follow
         mousePos = app.mouseWatcherNode.getMouse()
         mouseRay.setFromLens(app.camNode,
                              mousePos.getX(),
                              mousePos.getY())
+        # Check for collisions and sort them
         collisionTraverser.traverse(builtins.render)
         if collisionHandler.getNumEntries() > 0:
             collisionHandler.sortEntries()
+            currentCollisionEntry = collisionHandler.getEntry(0)
             nodeUnderMouse = collisionHandler.getEntry(0).getIntoNode()
             onCubie = nodeUnderMouse.getParent(0)
-            # app.title.setText(intoNode.getParent(0).name)
         else:
             onCubie = False
         if dragging:
@@ -425,34 +439,28 @@ def mouseTask(task):
 
 def grabCubie():
     global dragging
+    global nodeUnderMouse
     if onCubie:
         dragging = onCubie
+        print(nodeUnderMouse.name)
+        collisionNormal = currentCollisionEntry.getSurfaceNormal(
+            cameraRig
+            )
+        print(collisionNormal)
+        for key, value in sliceTypes.items():
+            # print(value.getNormal())
+            # print("==")
+            # print(collisionNormal)
+            if value.getNormal() == collisionNormal:
+                print(key)
     else:
         dragging = tempNode
-    # global startClickPoint
-    # if onCube:
-    #     startClickPoint = builtins.render.getRelativePoint(
-    #         tempNode, mouseRay.getOrigin()
-    #     )
-    # else:
-    #     startClickPoint = False
 
 
 def releaseCubie():
     global dragging
     if onCubie or dragging:
         dragging = False
-    # global startClickPoint
-    # if startClickPoint:
-    #     cubie = nodeUnderMouse.getParent(0)
-    #     endClickPoint = builtins.render.getRelativePoint(
-    #         tempNode, mouseRay.getOrigin()
-    #     )
-    #     delta = endClickPoint - startClickPoint
-    #     print(nodeUnderMouse.getParent(0).name)
-    #     print(str(round(delta[0], 2)) + ", "
-    #           + str(round(delta[1], 2)) + ", "
-    #           + str(round(delta[2], 2)))
 
 
 def onSpace():
@@ -460,6 +468,7 @@ def onSpace():
     # print(tempNode.getChildren())
     for cubie in cubies:
         print(cubie.name + ":" + str(cubie.getPos(builtins.render)))
+
 
 # Camera constants
 CAMERADIST = 8
@@ -534,10 +543,18 @@ countText = OnscreenText(
 )
 
 playButtonImages = (
-    builtins.loader.loadTexture("./baseline_play_circle_outline_white_48dp.png"),
-    builtins.loader.loadTexture("./baseline_play_circle_outline_black_48dp.png"),
-    builtins.loader.loadTexture("./baseline_play_circle_outline_white_48dp.png"),
-    builtins.loader.loadTexture("./baseline_play_circle_outline_white_48dp.png")
+    builtins.loader.loadTexture(
+        "./baseline_play_circle_outline_white_48dp.png"
+        ),
+    builtins.loader.loadTexture(
+        "./baseline_play_circle_outline_black_48dp.png"
+        ),
+    builtins.loader.loadTexture(
+        "./baseline_play_circle_outline_white_48dp.png"
+        ),
+    builtins.loader.loadTexture(
+        "./baseline_play_circle_outline_white_48dp.png"
+        )
 )
 replayButtonImages = (
     builtins.loader.loadTexture("./baseline_replay_white_48dp.png"),
@@ -576,14 +593,14 @@ pickerNode.addSolid(mouseRay)
 collisionTraverser.addCollider(pickerNodePath, collisionHandler)
 
 sliceTypes = {
-    "Up": Plane(Vec3(0, 0, -1), Point3(0, 0, 1)),
-    "Down": Plane(Vec3(0, 0, 1), Point3(0, 0, -1)),
-    "Equator": Plane(Vec3(0, 0, 1), Point3(0, 0, 0)),
-    "Front": Plane(Vec3(0, -1, 0), Point3(0, 1, 0)),
-    "Back": Plane(Vec3(0, 1, 0), Point3(0, -1, 0)),
+    "Up": Plane(Vec3(0, 0, 1), Point3(0, 0, 1)),
+    "Down": Plane(Vec3(0, 0, -1), Point3(0, 0, -1)),
+    "Equator": Plane(Vec3(0, 0, -1), Point3(0, 0, 0)),
+    "Front": Plane(Vec3(0, 1, 0), Point3(0, 1, 0)),
+    "Back": Plane(Vec3(0, -1, 0), Point3(0, -1, 0)),
     "Standing": Plane(Vec3(0, 1, 0), Point3(0, 0, 0)),
-    "Left": Plane(Vec3(-1, 0, 0), Point3(1, 0, 0)),
-    "Right": Plane(Vec3(1, 0, 0), Point3(-1, 0, 0)),
+    "Left": Plane(Vec3(1, 0, 0), Point3(1, 0, 0)),
+    "Right": Plane(Vec3(-1, 0, 0), Point3(-1, 0, 0)),
     "Middle": Plane(Vec3(1, 0, 0), Point3(0, 0, 0)),
 }
 
@@ -601,7 +618,7 @@ rePlayButton.hide()
 cubies = NodePathCollection()
 cubies.reserve(27)
 cubieCollisions = NodePathCollection()
-cubieCollisions.reserve(27)
+cubieCollisions.reserve(54)
 cubieSetup()
 
 tempNode = cameraRig.attachNewNode("tempNode")
