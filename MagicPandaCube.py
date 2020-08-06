@@ -20,9 +20,10 @@ from direct.interval.LerpInterval import LerpHprInterval
 from direct.interval.LerpInterval import LerpScaleInterval
 from direct.interval.IntervalGlobal import Sequence, Func
 from direct.showbase.ShowBase import ShowBase
-import sys
-import random
 from datetime import datetime
+import random
+import sys
+import math
 
 
 # GUI functions
@@ -406,6 +407,20 @@ def acceptInput(app):
         rePlayButton.show()
 
 
+def getVectorInfo(v):
+    print(v)
+    print("x: " + str(v.x))
+    print("y: " + str(v.y))
+    print("z: " + str(v.z))
+    print("c: " + str(math.sqrt(pow(v.x, 2) + pow(v.y, 2))))
+    h = math.atan2(v.y, v.x)
+    p = math.atan2(v.z, math.sqrt(pow(v.x, 2) + pow(v.y, 2)))
+    r = ""
+    print("h:" + str(math.degrees(h)))
+    print("p:" + str(math.degrees(p)))
+    return h, p, r
+
+
 # Mouse functions
 def mouseTask(task):
     global mousePos
@@ -415,6 +430,7 @@ def mouseTask(task):
     global startClickPoint
     global currentCollisionEntry
     # First check if we have the mouse in the window
+
     if app.mouseWatcherNode.hasMouse():
         # Get the position of the mouse and make the collision ray follow
         mousePos = app.mouseWatcherNode.getMouse()
@@ -426,12 +442,21 @@ def mouseTask(task):
         if collisionHandler.getNumEntries() > 0:
             collisionHandler.sortEntries()
             currentCollisionEntry = collisionHandler.getEntry(0)
+            currentCollisionPoint = currentCollisionEntry.getSurfacePoint(
+                builtins.render
+            )
             nodeUnderMouse = collisionHandler.getEntry(0).getIntoNode()
             onCubie = nodeUnderMouse.getParent(0)
         else:
             onCubie = False
         if dragging:
-            app.title.setText("dragging " + dragging.name)
+            mousePoint = builtins.render.getRelativePoint(
+                tempNode, mouseRay.getOrigin()
+            )
+            app.title.setText(
+                "dragging " + dragging.name + " "
+                + str(mousePoint)
+                )
         else:
             app.title.setText(" ")
     return task.cont
@@ -440,19 +465,28 @@ def mouseTask(task):
 def grabCubie():
     global dragging
     global nodeUnderMouse
+    global startClickPoint
+    startClickPoint = currentCollisionEntry.getSurfacePoint(
+        builtins.render
+        )
     if onCubie:
-        dragging = onCubie
-        print(nodeUnderMouse.name)
+        dragging = builtins.render.find("**/" + onCubie.name)
         collisionNormal = currentCollisionEntry.getSurfaceNormal(
-            cameraRig
+            builtins.render
             )
-        print(collisionNormal)
+        collisionNormal = Vec3(
+            round(collisionNormal[0]),
+            round(collisionNormal[1]),
+            round(collisionNormal[2])
+            )
+        print(" ")
+        print(dragging.name)
         for key, value in sliceTypes.items():
-            # print(value.getNormal())
-            # print("==")
-            # print(collisionNormal)
-            if value.getNormal() == collisionNormal:
-                print(key)
+            pos = dragging.getPos(builtins.render)
+            d = value.distToPlane(pos)
+            if d < 0.1 and d > -0.1:
+                if (collisionNormal != value.getNormal()):
+                    print(key)
     else:
         dragging = tempNode
 
