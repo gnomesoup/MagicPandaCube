@@ -1,7 +1,7 @@
 import builtins
 from panda3d.core import AmbientLight
 from panda3d.core import BitMask32
-from panda3d.core import Vec3, Vec4, Point3
+from panda3d.core import Vec3, Vec4, Point3, Point2
 from panda3d.core import Plane
 from panda3d.core import Material
 from panda3d.core import CollisionTraverser
@@ -408,17 +408,16 @@ def acceptInput(app):
 
 
 def getVectorInfo(v):
-    print(v)
-    print("x: " + str(v.x))
-    print("y: " + str(v.y))
-    print("z: " + str(v.z))
-    print("c: " + str(math.sqrt(pow(v.x, 2) + pow(v.y, 2))))
     h = math.atan2(v.y, v.x)
     p = math.atan2(v.z, math.sqrt(pow(v.x, 2) + pow(v.y, 2)))
     r = ""
     print("h:" + str(math.degrees(h)))
     print("p:" + str(math.degrees(p)))
     return h, p, r
+
+
+def getXYVectorLength(v):
+    return math.sqrt(pow(v.x, 2) + pow(v.y, 2))
 
 
 # Mouse functions
@@ -429,6 +428,8 @@ def mouseTask(task):
     global dragging
     global startClickPoint
     global currentCollisionEntry
+    global lastCollisionEndpoint
+    global dragStartPoint
     # First check if we have the mouse in the window
 
     if app.mouseWatcherNode.hasMouse():
@@ -442,7 +443,7 @@ def mouseTask(task):
         if collisionHandler.getNumEntries() > 0:
             collisionHandler.sortEntries()
             currentCollisionEntry = collisionHandler.getEntry(0)
-            currentCollisionPoint = currentCollisionEntry.getSurfacePoint(
+            lastCollisionEndpoint = currentCollisionEntry.getSurfacePoint(
                 builtins.render
             )
             nodeUnderMouse = collisionHandler.getEntry(0).getIntoNode()
@@ -450,15 +451,24 @@ def mouseTask(task):
         else:
             onCubie = False
         if dragging:
-            mousePoint = builtins.render.getRelativePoint(
-                tempNode, mouseRay.getOrigin()
-            )
-            app.title.setText(
-                "dragging " + dragging.name + " "
-                + str(mousePoint)
+            pos3d = Point3()
+            nearPoint = Point3()
+            farPoint = Point3()
+            builtins.base.camLens.extrude(mousePos, nearPoint, farPoint)
+            if sliceTypes[dragSlices[0]].intersectsLine(
+                pos3d,
+                builtins.render.getRelativePoint(
+                    builtins.camera, nearPoint
+                ),
+                builtins.render.getRelativePoint(
+                    builtins.camera, farPoint
                 )
+            ):
+                dragVector = pos3d - dragStartPoints[1]
+                print(dragVector)
+                tempNode.setP(dragVector.y * -90)
         else:
-            app.title.setText(" ")
+            pass
     return task.cont
 
 
@@ -466,29 +476,54 @@ def grabCubie():
     global dragging
     global nodeUnderMouse
     global startClickPoint
-    startClickPoint = currentCollisionEntry.getSurfacePoint(
-        builtins.render
-        )
-    if onCubie:
-        dragging = builtins.render.find("**/" + onCubie.name)
-        collisionNormal = currentCollisionEntry.getSurfaceNormal(
-            builtins.render
-            )
-        collisionNormal = Vec3(
-            round(collisionNormal[0]),
-            round(collisionNormal[1]),
-            round(collisionNormal[2])
-            )
-        print(" ")
-        print(dragging.name)
-        for key, value in sliceTypes.items():
-            pos = dragging.getPos(builtins.render)
-            d = value.distToPlane(pos)
-            if d < 0.1 and d > -0.1:
-                if (collisionNormal != value.getNormal()):
-                    print(key)
-    else:
-        dragging = tempNode
+    global mousePos
+    global dragSlices
+    global dragStartPoints
+    print("mouseClickDown")
+    if dragging is False:
+        if onCubie:
+            dragging = builtins.render.find("**/" + onCubie.name)
+            dragStartPoint = mousePos
+            collisionNormal = currentCollisionEntry.getSurfaceNormal(
+                builtins.render
+                )
+            collisionNormal = Vec3(
+                round(collisionNormal[0]),
+                round(collisionNormal[1]),
+                round(collisionNormal[2])
+                )
+            print(" ")
+            print(dragging.name)
+            dragSlices = []
+            for key, value in sliceTypes.items():
+                pos = dragging.getPos(builtins.render)
+                d = value.distToPlane(pos)
+                if d < 0.1 and d > -0.1:
+                    if (collisionNormal != value.getNormal()):
+                        dragSlices.append(key)
+                        print(key)
+            dragStartPoints = []
+            for dragSlice in dragSlices:
+                dragStartPoint = Point3()
+                nearPoint = Point3()
+                farPoint = Point3()
+                builtins.base.camLens.extrude(mousePos, nearPoint, farPoint)
+                sliceTypes[dragSlice].intersectsLine(
+                    dragStartPoint,
+                    builtins.render.getRelativePoint(
+                        builtins.camera, nearPoint
+                    ),
+                    builtins.render.getRelativePoint(
+                        builtins.camera, farPoint
+                    )
+                )
+                dragStartPoints.append(dragStartPoint)
+            cubies.wrtReparentTo(builtins.render)
+            tempNode.clearTransform()
+            getCubiesInSlice(dragSlices[1]).wrtReparentTo(tempNode)
+        else:
+            cubies.wrtReparentTo(tempNode)
+            dragging = tempNode
 
 
 def releaseCubie():
@@ -665,6 +700,9 @@ turnCount = 0
 gameStarted = False
 gameTime = None
 dragging = False
+dragSlices = []
+lastCollisionEndpoint = None
+dragStartPoints = None
 builtins.taskMgr.add(mouseTask, "mouseTask")
 acceptInput(app)
 app.run()
