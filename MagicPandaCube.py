@@ -88,10 +88,10 @@ class MagicCube(ShowBase):
         self.replayButton = DirectButton(
             text=("", "", "Reset Cube", ""),
             text_scale=1.3,
-            text_pos=(4.5, -.3),
+            text_pos=(5.5, -.325),
             text_fg=(1, 1, 1, 1),
             text_shadow=(0, 0, 0, 0.5),
-            frameTexture=self.playButtonImages,
+            frameTexture=self.replayButtonImages,
             scale=0.05,
             pos=(.2, .1, .15),
             frameSize=(-1.75, 1.75, -1.75, 1.75),
@@ -116,8 +116,6 @@ class MagicCube(ShowBase):
         cameraDist = 8
         camera.setPos(-cameraDist * 0.75, cameraDist, cameraDist)
         camera.lookAt(0, 0, 0)
-        self.cameraRig = render.attachNewNode("CameraRig")
-        camera.reparentTo(self.cameraRig)
 
         # Setup lights
         self.ambientLight = AmbientLight("ambientLight")
@@ -357,6 +355,7 @@ class MagicCube(ShowBase):
             cubie.setHpr(0, 0, 0)
         self.playButton.show()
         self.replayButton.hide()
+        self.title.setText(" ")
 
     def randomizeList(self, num):
         i = 0
@@ -400,12 +399,12 @@ class MagicCube(ShowBase):
         self.title.setText(randomizeReport)
         return randomizeReport
 
-    def hexColor(self, hex):
-        if len(hex) < 8:
-            hexa = "ff"
+    def hexColor(self, h):
+        if len(h) < 8:
+            ha = "ff"
         else:
-            hexa = hex[6:8]
-        hc = [hex[0:2], hex[2:4], hex[4:6], hexa]
+            ha = h[6:8]
+        hc = [h[0:2], h[2:4], h[4:6], ha]
         color = Vec4()
         for i in range(4):
             color[i] = int("0x" + hc[i], 16) / 255
@@ -677,6 +676,8 @@ class MagicCube(ShowBase):
             else:
                 self.onCubie = False
             if self.dragging:
+                if len(self.dragSlices) < 1:
+                    self.dragSlices = ["Equator"]
                 pos3d = Point3()
                 nearPoint = Point3()
                 farPoint = Point3()
@@ -693,9 +694,9 @@ class MagicCube(ShowBase):
                         camera, farPoint
                     )
                 ):
-                    dragVector = pos3d - self.dragStartPoints[1]
+                    dragVector = pos3d - self.dragStartPoints[0]
                     print(dragVector)
-                    self.rotationNode.setP(dragVector.y * -90)
+                    self.rotationNode.setH(dragVector.x * -90)
             else:
                 pass
         return task.again
@@ -704,7 +705,7 @@ class MagicCube(ShowBase):
         print("mouseClickDown")
         if self.dragging is False:
             if self.onCubie:
-                dragging = render.find("**/" + self.onCubie.name)
+                self.dragging = render.find("**/" + self.onCubie.name)
                 dragStartPoint = self.mousePos
                 collisionNormal = self.currentCollisionEntry.getSurfaceNormal(
                     render
@@ -718,7 +719,7 @@ class MagicCube(ShowBase):
                 print(self.dragging.name)
                 self.dragSlices = []
                 for key, value in self.sliceTypes.items():
-                    pos = dragging.getPos(render)
+                    pos = self.dragging.getPos(render)
                     d = value.distToPlane(pos)
                     if d < 0.1 and d > -0.1:
                         if (collisionNormal != value.getNormal()):
@@ -726,35 +727,45 @@ class MagicCube(ShowBase):
                             print(key)
                 self.dragStartPoints = []
                 for dragSlice in self.dragSlices:
-                    dragStartPoint = Point3()
-                    nearPoint = Point3()
-                    farPoint = Point3()
-                    base.camLens.extrude(
-                        self.mousePos,
-                        nearPoint,
-                        farPoint
-                        )
-                    self.sliceTypes[dragSlice].intersectsLine(
-                        dragStartPoint,
-                        render.getRelativePoint(
-                            camera, nearPoint
-                        ),
-                        render.getRelativePoint(
-                            camera, farPoint
-                        )
-                    )
+                    dragPlane = self.sliceTypes[dragSlice]
+                    dragStartPoint = self.getMousePointOnPlane(dragPlane)
                     self.dragStartPoints.append(dragStartPoint)
                 self.cubies.wrtReparentTo(render)
                 self.rotationNode.clearTransform()
-                nodes = self.getCubiesInSlice(self.dragSlices[1])
+                nodes = self.getCubiesInSlice(self.dragSlices[0])
                 nodes.wrtReparentTo(self.rotationNode)
             else:
                 self.cubies.wrtReparentTo(self.rotationNode)
                 self.dragging = self.rotationNode
+                self.dragSlices = ["Equator"]
+                dragStartPoint = self.getMousePointOnPlane(
+                    self.sliceTypes[self.dragSlices[0]]
+                )
+                self.dragStartPoints = [dragStartPoint]
 
     def releaseCubie(self):
         if self.onCubie or self.dragging:
             self.dragging = False
+
+    def getMousePointOnPlane(self, plane):
+        dragStartPoint = Point3()
+        nearPoint = Point3()
+        farPoint = Point3()
+        base.camLens.extrude(
+            self.mousePos,
+            nearPoint,
+            farPoint
+        )
+        plane.intersectsLine(
+            dragStartPoint,
+            render.getRelativePoint(
+                camera, nearPoint
+            ),
+            render.getRelativePoint(
+                camera, farPoint
+            )
+        )
+        return dragStartPoint
 
     def onSpace(self):
         # print("self.rotationNode Children:")
