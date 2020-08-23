@@ -661,23 +661,22 @@ class MagicCube(ShowBase):
         if self.mouseWatcherNode.hasMouse():
             # Get the position of the mouse and make the collision ray follow
             self.mousePos = self.mouseWatcherNode.getMouse()
-            self.mouseRay.setFromLens(
-                self.camNode,
-                self.mousePos.getX(),
-                self.mousePos.getY()
-                )
-            # Check for collisions and sort them
-            self.collisionTraverser.traverse(render)
-            if self.collisionHandler.getNumEntries() > 0:
-                self.collisionHandler.sortEntries()
-                self.currentCollisionEntry = self.collisionHandler.getEntry(0)
-                nodeUnderMouse = self.currentCollisionEntry.getIntoNode()
-                self.onCubie = nodeUnderMouse.getParent(0)
+            if not self.dragging:
+                self.mouseRay.setFromLens(
+                    self.camNode,
+                    self.mousePos.getX(),
+                    self.mousePos.getY()
+                    )
+                # Check for collisions and sort them
+                self.collisionTraverser.traverse(render)
+                if self.collisionHandler.getNumEntries() > 0:
+                    self.collisionHandler.sortEntries()
+                    self.currentEntry = self.collisionHandler.getEntry(0)
+                    nodeUnderMouse = self.currentEntry.getIntoNode()
+                    self.onCubie = nodeUnderMouse.getParent(0)
+                else:
+                    self.onCubie = False
             else:
-                self.onCubie = False
-            if self.dragging:
-                if len(self.dragSlices) < 1:
-                    self.dragSlices = ["Equator"]
                 pos3d = Point3()
                 nearPoint = Point3()
                 farPoint = Point3()
@@ -685,29 +684,34 @@ class MagicCube(ShowBase):
                     self.mousePos,
                     nearPoint,
                     farPoint)
-                if self.sliceTypes[self.dragSlices[0]].intersectsLine(
-                    pos3d,
-                    render.getRelativePoint(
-                        camera, nearPoint
-                    ),
-                    render.getRelativePoint(
-                        camera, farPoint
-                    )
+                dragVectors = []
+                for dragSlice, startPoint in zip(
+                    self.dragSlices, self.dragStartPoints
                 ):
-                    dragVector = pos3d - self.dragStartPoints[0]
-                    print(dragVector)
-                    self.rotationNode.setH(dragVector.x * -90)
-            else:
-                pass
+                    slicePlane = self.sliceTypes[dragSlice]
+                    if slicePlane.intersectsLine(
+                        pos3d,
+                        render.getRelativePoint(
+                            camera, nearPoint
+                        ),
+                        render.getRelativePoint(
+                            camera, farPoint
+                        )
+                    ):
+                        dragVector = pos3d - startPoint
+                        dragVectors.append(dragVector)
+                m = max(dragVectors, key=self.getXYVectorLength)
+                i = dragVectors.index(m)
+                print(self.dragSlices[i])
         return task.again
 
     def grabCubie(self):
         print("mouseClickDown")
-        if self.dragging is False:
+        if not self.dragging:
             if self.onCubie:
                 self.dragging = render.find("**/" + self.onCubie.name)
                 dragStartPoint = self.mousePos
-                collisionNormal = self.currentCollisionEntry.getSurfaceNormal(
+                collisionNormal = self.currentEntry.getSurfaceNormal(
                     render
                     )
                 collisionNormal = Vec3(
@@ -725,23 +729,19 @@ class MagicCube(ShowBase):
                         if (collisionNormal != value.getNormal()):
                             self.dragSlices.append(key)
                             print(key)
-                self.dragStartPoints = []
-                for dragSlice in self.dragSlices:
-                    dragPlane = self.sliceTypes[dragSlice]
-                    dragStartPoint = self.getMousePointOnPlane(dragPlane)
-                    self.dragStartPoints.append(dragStartPoint)
-                self.cubies.wrtReparentTo(render)
-                self.rotationNode.clearTransform()
-                nodes = self.getCubiesInSlice(self.dragSlices[0])
-                nodes.wrtReparentTo(self.rotationNode)
+                # self.cubies.wrtReparentTo(render)
+                # self.rotationNode.clearTransform()
+                # nodes = self.getCubiesInSlice(self.dragSlices[0])
+                # nodes.wrtReparentTo(self.rotationNode)
             else:
-                self.cubies.wrtReparentTo(self.rotationNode)
+                # self.cubies.wrtReparentTo(self.rotationNode)
                 self.dragging = self.rotationNode
-                self.dragSlices = ["Equator"]
-                dragStartPoint = self.getMousePointOnPlane(
-                    self.sliceTypes[self.dragSlices[0]]
-                )
-                self.dragStartPoints = [dragStartPoint]
+                self.dragSlices = ["Equator", "Middle"]
+            self.dragStartPoints = []
+            for dragSlice in self.dragSlices:
+                dragPlane = self.sliceTypes[dragSlice]
+                dragStartPoint = self.getMousePointOnPlane(dragPlane)
+                self.dragStartPoints.append(dragStartPoint)
 
     def releaseCubie(self):
         if self.onCubie or self.dragging:
