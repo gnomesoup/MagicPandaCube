@@ -17,6 +17,7 @@ from direct.gui.DirectGui import OnscreenImage
 from direct.gui.DirectGui import DirectButton
 from direct.gui.DirectGui import DGG
 from direct.interval.LerpInterval import LerpHprInterval
+from direct.interval.LerpInterval import LerpQuatInterval
 from direct.interval.LerpInterval import LerpScaleInterval
 from direct.interval.IntervalGlobal import Sequence, Func
 from direct.showbase.ShowBase import ShowBase
@@ -24,6 +25,8 @@ from datetime import datetime
 import random
 import sys
 import math
+
+sin45 = math.sin(45)
 
 
 class MagicCube(ShowBase):
@@ -444,6 +447,8 @@ class MagicCube(ShowBase):
 
     def checkSolved(self):
         solved = True
+        if self.rotationNode:
+            print("Quat:", self.rotationNode.getQuat())
         for i in range(3):
             matchPosCount = [0, 0, 0]
             matchPos = None
@@ -569,21 +574,30 @@ class MagicCube(ShowBase):
         self.moveSequence.start()
 
     def completeRotation(self):
-        print("Current Slice: ", self.currentSlice)
         if self.moveSequence:
             self.moveSequence.finish()
-        currentHpr = self.rotationNode.getHpr()
-        completeHpr = Vec3(0, 0, 0)
-        for i, c in enumerate(currentHpr):
-            if round(c) != 0:
-                cSign = 1
-                if c < 0:
-                    cSign = -1
-                completeHpr[i] = math.floor((abs(c) + 90) / 90) * 90 * cSign
-        print(completeHpr)
-        i = LerpHprInterval(
+        currentQuat = self.rotationNode.getQuat()
+        print(
+            "Quat",
+            currentQuat,
+            currentQuat.getAngle(),
+            currentQuat.getAxis().normalized()
+        )
+        currentAngle = currentQuat.getAngle()
+        if abs(currentAngle) < 45:
+            currentAngle = (abs(currentAngle) + 45)
+        completeAngle = round(currentAngle / 90) * 90
+        print("Current:", currentAngle, "Finished:", completeAngle)
+        # completeHpr = Vec3(0, 0, 0)
+        completeQuat = Quat()
+        completeQuat.setFromAxisAngle(
+            abs(completeAngle),
+            currentQuat.getAxis().normalized()
+        )
+        # completeHpr[hprIndex] = completeAngle
+        i = LerpQuatInterval(
             self.rotationNode, 0.1,
-            completeHpr
+            completeQuat
             )
         self.moveSequence = Sequence(
             i,
@@ -738,9 +752,8 @@ class MagicCube(ShowBase):
                                     self.currentSlice = dragSlice
                                     self.cubies.wrtReparentTo(render)
                                     self.rotationNode.clearTransform()
-                                    self.getCubiesInSlice(dragSlice).wrtReparentTo(
-                                        self.rotationNode
-                                    )
+                                    self.getCubiesInSlice(dragSlice)\
+                                        .wrtReparentTo(self.rotationNode)
                                     return task.again
                                 else:
                                     self.previousSlice = dragSlice
@@ -861,10 +874,22 @@ class MagicCube(ShowBase):
         return p
 
     def onSpace(self):
-        # print("self.rotationNode Children:")
-        # print(self.rotationNode.getChildren())
-        for cubie in self.cubies:
-            print(cubie.name + ":" + str(cubie.getPos(render)))
+        self.cubies.wrtReparentTo(render)
+        self.rotationNode.clearTransform()
+        self.cubies.wrtReparentTo(self.rotationNode)
+        # self.rotationNode.setQuat(
+        #     render,
+        #     Quat(sin45, sin45, 0, 0) * Quat(sin45, 0, sin45, 0)
+        #     )
+        q = Quat()
+        q.setFromAxisAngle(-90, Vec3.left())
+        LerpQuatInterval(
+            self.rotationNode,
+            0.2,
+            # Quat(math.cos(90)+math.sin(90), Vec3(1, 0, 0)),
+            q,
+            other=render
+        ).start()
 
 
 magicCube = MagicCube()
