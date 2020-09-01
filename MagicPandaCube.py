@@ -241,12 +241,12 @@ class MagicCube(ShowBase):
                     name = ""
                     if self.colorIf(
                         cubie, "Up",
-                        self.yellow, self.black,
+                        self.white, self.black,
                         z, 2
                     ):
                         sideCount = sideCount + 1
-                        name += "Y"
-                        cNode = CollisionNode("Yellow")
+                        name += "W"
+                        cNode = CollisionNode("White")
                         quad = CollisionPolygon(Point3(-.5, -.5, .5),
                                                 Point3(.5, -.5, .5),
                                                 Point3(.5, .5, .5),
@@ -257,12 +257,12 @@ class MagicCube(ShowBase):
                             )
                     if self.colorIf(
                         cubie, "Down",
-                        self.white, self.black,
+                        self.yellow, self.black,
                         z, 0
                     ):
                         sideCount = sideCount + 1
-                        name += "W"
-                        cNode = CollisionNode("White")
+                        name += "Y"
+                        cNode = CollisionNode("Yellow")
                         quad = CollisionPolygon(
                             Point3(-.5, -.5, -.5),
                             Point3(-.5, .5, -.5),
@@ -275,12 +275,12 @@ class MagicCube(ShowBase):
                             )
                     if self.colorIf(
                         cubie, "Front",
-                        self.blue, self.black,
+                        self.green, self.black,
                         y, 2
                     ):
                         sideCount = sideCount + 1
-                        name += "B"
-                        cNode = CollisionNode("Blue")
+                        name += "G"
+                        cNode = CollisionNode("Green")
                         quad = CollisionPolygon(Point3(-.5, .5, -.5),
                                                 Point3(-.5, .5, .5),
                                                 Point3(.5, .5, .5),
@@ -291,12 +291,12 @@ class MagicCube(ShowBase):
                             )
                     if self.colorIf(
                         cubie, "Back",
-                        self.green, self.black,
+                        self.blue, self.black,
                         y, 0
                     ):
                         sideCount = sideCount + 1
-                        name += "G"
-                        cNode = CollisionNode("Green")
+                        name += "B"
+                        cNode = CollisionNode("Blue")
                         quad = CollisionPolygon(Point3(-.5, -.5, -.5),
                                                 Point3(.5, -.5, -.5),
                                                 Point3(.5, -.5, .5),
