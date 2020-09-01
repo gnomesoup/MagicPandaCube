@@ -355,6 +355,7 @@ class MagicCube(ShowBase):
     def cubieReset(self):
         self.turnCount = 0
         self.checkSolved()
+        self.gameStarted = False
         self.cubies.reparentTo(render)
         for cubie in self.cubies:
             pos = cubie.getPythonTag("originalPos")
@@ -446,9 +447,10 @@ class MagicCube(ShowBase):
         return sliceCollection
 
     def checkSolved(self):
+        print("checkSolved")
         solved = True
-        if self.rotationNode:
-            print("Quat:", self.rotationNode.getQuat())
+        # if self.rotationNode:
+        #     print("Quat:", self.rotationNode.getQuat())
         for i in range(3):
             matchPosCount = [0, 0, 0]
             matchPos = None
@@ -458,8 +460,10 @@ class MagicCube(ShowBase):
                 pos = cubie.getPos(render)
                 hpr = cubie.getHpr(render)
                 currentPos = (round(pos[0]), round(pos[1]), round(pos[2]))
+                # print("cubieQuat:", cubie.getQuat())
                 cleanHpr = Vec3(round(hpr[0]), round(hpr[1]), round(hpr[2]))
-                cubie.setPosHpr(render, currentPos, cleanHpr)
+                # print("cleanHpr:", cleanHpr)
+                # cubie.setPosHpr(render, currentPos, cleanHpr)
                 currentHpr = Vec3(
                     abs(round(hpr[0])),
                     abs(round(hpr[1])),
@@ -553,10 +557,6 @@ class MagicCube(ShowBase):
             self.turnCount += 1
 
     def rotateCube(self, hAngle, pAngle, rAngle):
-        # referenceHpr = self.referenceNode.getHpr(render)
-        # referenceNode.setHpr(referenceHpr[0] + hAngle,
-        #                     referenceHpr[1] + pAngle,
-        #                     referenceHpr[2] + rAngle)
         if self.rotationNode.getNumChildren() > 0:
             self.rotationNode.getChildren().wrtReparentTo(render)
         self.rotationNode.clearTransform()
@@ -574,27 +574,36 @@ class MagicCube(ShowBase):
         self.moveSequence.start()
 
     def completeRotation(self):
+        print("completeRotation")
         if self.moveSequence:
             self.moveSequence.finish()
         currentQuat = self.rotationNode.getQuat()
-        print(
-            "Quat",
-            currentQuat,
-            currentQuat.getAngle(),
-            currentQuat.getAxis().normalized()
-        )
         currentAngle = currentQuat.getAngle()
-        if abs(currentAngle) < 45:
+        if round(currentAngle) in (0, 45, 90):
+            print("Alert!!!", currentAngle)
+            print(
+                "Quat",
+                currentQuat,
+                currentQuat.getAngle(),
+                currentQuat.getAxis().normalized()
+            )
+        if round(currentAngle) == 0:
+            return
+        if abs(currentAngle) <= 45:
             currentAngle = (abs(currentAngle) + 45)
         completeAngle = round(currentAngle / 90) * 90
-        print("Current:", currentAngle, "Finished:", completeAngle)
-        # completeHpr = Vec3(0, 0, 0)
+        # print("Current:", currentAngle, "Finished:", completeAngle)
         completeQuat = Quat()
         completeQuat.setFromAxisAngle(
             abs(completeAngle),
             currentQuat.getAxis().normalized()
         )
-        # completeHpr[hprIndex] = completeAngle
+        print(
+            "Quat",
+            completeQuat,
+            completeQuat.getAngle(),
+            completeQuat.getAxis().normalized()
+        )
         i = LerpQuatInterval(
             self.rotationNode, 0.1,
             completeQuat
@@ -759,24 +768,19 @@ class MagicCube(ShowBase):
                                     self.previousSlice = dragSlice
                     else:
                         v = self.mouseStartPoint - self.mousePos
-                        v.normalize()
-                        # v = Vec2(round(v[0], 2), round(v[1], 2))
+                        # v.normalize()
                         dragVectors.append(v)
                         dragSlice = None
                         if abs(v[0]) > abs(v[1]):
                             dragSlice = "Equator"
-                        elif v[0] < 0:
+                        elif round(self.mousePos[0], 2) > 0:
                             dragSlice = "Standing"
-                        elif v[0] > 0:
+                        elif round(self.mousePos[0], 2) < 0:
                             dragSlice = "Middle"
                         if self.previousSlice == dragSlice:
                             self.currentSlice = dragSlice
                         else:
                             self.previousSlice = dragSlice
-                        # for dragSlice in self.dragSlices:
-                        #     dragPlane = self.sliceTypes[dragSlice]
-                        #     a = v.angleDeg(dragPlane.getNormal)
-                        #     dragAngles.append(a)
             elif self.dragging:
                 slicePlane = self.sliceTypes[self.currentSlice]
                 mousePos3d = self.getMousePointOnPlane(
@@ -836,7 +840,13 @@ class MagicCube(ShowBase):
     def releaseCubie(self):
         print("mouseRelease")
         if self.onCubie or self.dragging:
-            self.completeRotation()
+            if (
+                self.currentVector
+                and round(self.rotationNode.getQuat().getAngle()) != 0
+            ):
+                self.completeRotation()
+            else:
+                self.rotationNode.clearTransform()
             self.dragging = False
             self.currentSlice = None
             self.currentVector = None
