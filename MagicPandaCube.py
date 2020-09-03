@@ -449,6 +449,7 @@ class MagicCube(ShowBase):
     def checkSolved(self):
         print("checkSolved")
         solved = True
+        self.cubies.wrtReparentTo(render)
         # if self.rotationNode:
         #     print("Quat:", self.rotationNode.getQuat())
         for i in range(3):
@@ -575,7 +576,8 @@ class MagicCube(ShowBase):
 
     def completeRotation(self):
         print("completeRotation")
-        if self.moveSequence:
+        if self.moveSequence and self.moveSequence.isPlaying():
+            print("Finish Sequence:", self.moveSequence.isPlaying())
             self.moveSequence.finish()
         currentQuat = self.rotationNode.getQuat()
         currentAngle = currentQuat.getAngle()
@@ -587,8 +589,6 @@ class MagicCube(ShowBase):
                 currentQuat.getAngle(),
                 currentQuat.getAxis().normalized()
             )
-        if round(currentAngle) == 0:
-            return
         if abs(currentAngle) <= 45:
             currentAngle = (abs(currentAngle) + 45)
         completeAngle = round(currentAngle / 90) * 90
@@ -719,6 +719,8 @@ class MagicCube(ShowBase):
             round(v[2])))
 
     def mouseTask(self, task):
+        if self.moveSequence and self.moveSequence.isPlaying():
+            return task.again
         if self.mouseWatcherNode.hasMouse():
             self.mousePos = self.mouseWatcherNode.getMouse()
             if not self.currentSlice:
@@ -740,6 +742,8 @@ class MagicCube(ShowBase):
                 dragVectors = []
                 dragAngles = []
                 if self.dragging:
+                    if self.mouseStartPoint:
+                        self.mouseVector = self.mouseStartPoint - self.mousePos
                     if self.onCubie:
                         p = self.getCollisionSurfacePoint(self.currentEntry)
                         v = self.collisionStartPoint - p
@@ -767,8 +771,7 @@ class MagicCube(ShowBase):
                                 else:
                                     self.previousSlice = dragSlice
                     else:
-                        v = self.mouseStartPoint - self.mousePos
-                        # v.normalize()
+                        v = self.mouseVector
                         dragVectors.append(v)
                         dragSlice = None
                         if abs(v[0]) > abs(v[1]):
@@ -808,6 +811,8 @@ class MagicCube(ShowBase):
         return task.again
 
     def grabCubie(self):
+        if self.moveSequence and self.moveSequence.isPlaying():
+            return False
         print("mouseClickDown")
         if not self.dragging:
             self.mouseStartPoint = Vec2(
@@ -839,14 +844,20 @@ class MagicCube(ShowBase):
 
     def releaseCubie(self):
         print("mouseRelease")
-        if self.onCubie or self.dragging:
+        # if self.onCubie or self.dragging:
+        if self.dragging:
+            currentAngle = self.rotationNode.getQuat().getAngle()
+            vLength = self.getXYVectorLength(self.mouseVector)
+            print(vLength)
             if (
-                self.currentVector
-                and round(self.rotationNode.getQuat().getAngle()) != 0
+                vLength > 0.0005
+                and not math.isnan(currentAngle)
+                and round(currentAngle, 2) != 0
             ):
                 self.completeRotation()
             else:
                 self.rotationNode.clearTransform()
+                self.cubies.wrtReparentTo(render)
             self.dragging = False
             self.currentSlice = None
             self.currentVector = None
